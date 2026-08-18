@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# venv
+.venv/
+venv/
+env/
+
+# 测试与工具缓存
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# mcp-guarder 运行时产物（指纹库、审计流水、快照）
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+*.jsonl
+guard.log
+snapshots/
+
+# 编辑器 / 系统
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcp-guarder"
+version = "0.1.0"
+description = "MCP 安全网关：tool 描述投毒检测 / 默认拒绝的权限门 / 双向 secret 脱敏 / 结构化审计"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "Junkang Du" }]
+keywords = ["mcp", "security", "proxy", "prompt-injection", "audit"]
+classifiers = [
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Security",
+]
+dependencies = ["pyyaml>=6.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+mcp-guarder = "mcp_guarder.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcp_guarder"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

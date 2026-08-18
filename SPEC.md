@@ -4,21 +4,9 @@
 
 ## 1. 定位与非目标
 
-**一句话**：`mcp-guarder` 是一个 Python 写的 MCP 安全网关，以 stdio wrapper 的形式透明坐在 AI Agent 和
-MCP Server 之间，干四件事——**tool 描述投毒检测、默认拒绝的权限门、双向 secret 脱敏、结构化审计**。
+**一句话**：`mcp-guarder` 是一个 Python 写的 MCP 安全网关，以 stdio wrapper 的形式透明坐在 AI Agent 和 MCP Server 之间，干四件事——**tool 描述投毒检测、默认拒绝的权限门、双向 secret 脱敏、结构化审计**。挂上去只改一行配置：`{"type":"stdio","command":"python3","args":["/path/server.py"]}` 换成 `{"type":"stdio","command":"mcp-guarder","args":["--","python3","/path/server.py"]}`，实测 Claude Code 侧零感知，工具名仍是 `mcp__<server>__<tool>`。
 
-挂上去只改一行配置（实测 Claude Code 侧零感知，工具名仍是 `mcp__<server>__<tool>`）：
-
-```jsonc
-// 原来
-{"type":"stdio","command":"python3","args":["/path/server.py"]}
-// 挂网关
-{"type":"stdio","command":"mcp-guarder","args":["--","python3","/path/server.py"]}
-```
-
-**为什么不是 Claude Code hooks**：hooks 能做权限门（`PreToolUse` + `permissionDecision: deny`）和参数改写
-（`updatedInput`），但看不到也改不了 tool description/schema，更改不了 tool result。**投毒检测和结果脱敏只有
-传输层代理够得着**——这是本项目存在的全部理由，其余能力可以退化成 hook。
+**为什么不是 Claude Code hooks**：hooks 能做权限门（`PreToolUse` + `permissionDecision: deny`）和参数改写（`updatedInput`），但看不到也改不了 tool description/schema，更改不了 tool result。**投毒检测和结果脱敏只有传输层代理够得着**——这是本项目存在的全部理由，其余能力可以退化成 hook。
 
 ### 不做什么
 
@@ -32,6 +20,18 @@ MCP Server 之间，干四件事——**tool 描述投毒检测、默认拒绝�
 8. **不做凭证托管**。不接管 OAuth、不存 token、不替换 header。
 9. **不做 HTTP/SSE transport**。不是排期问题：OAuth resource identity 没想清楚之前一行都不写（§3）。
 10. **不做人工逐条批准**。默认拒绝靠规则不靠人肉点确认（`ask` 排到 M3 且可选）。
+
+### 与现有项目的边界
+
+| 项目 | 看什么 | 什么时机 | 手段 | 在数据通路上 |
+|---|---|---|---|---|
+| A `flickzoz/mcp-guard` | MCP 配置文件（`~/.claude.json`、`claude_desktop_config.json`、cursor 的 mcp.json） | 装之前扫一次，一次性 CLI | 查硬编码密钥、`bash -c` 注入、`curl \| sh` 远程执行、`/` 和 `~` 宽泛挂载、`@latest` 不固定版本 | 否，连 MCP 协议都不解析 |
+| B `General-Analysis/mcp-guard` | 流经代理的消息内容 | 运行时 | AI 驱动的内容审核判 prompt injection，顺带聚合多个 server；要 `ga login` 登录他们的账号 | 是（架构形态跟我们一样） |
+| `mcp-guarder` | `tools/list` 的描述、`tools/call` 的参数和结果 | 运行时 | TOFU 指纹 + 正则静态检查 + 默认拒绝权限门 + 双向脱敏 + JSONL 审计 | 是 |
+
+- **我们不做配置文件静态扫描**——那是 A 的活，两者互补：A 在装之前查配置写成什么样，我们在跑起来之后盯它实际干了什么。（A 只有 1 个 commit、README 的 PyPI 徽章指向一个不存在的包，实际可用性得自己验。）
+- **我们不做 LLM 内容审核**——那是 B 的路子。这跟上面非目标第 2 条「不做模型侧防护」是同一条边界的两种说法：判定只用确定性规则（指纹、正则、policy），不引模型、不联网、不登录。（B 4 个 commit、55 star，最后 push 停在 2026-06。）
+- 两家都没有、我们独有的是 **TOFU 指纹撑起来的 rug pull 检测，加上每条决策都落盘的结构化审计**。
 
 ## 2. 威胁模型
 

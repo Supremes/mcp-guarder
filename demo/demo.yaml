@@ -1,0 +1,95 @@
+# SPEC §8 的 5 分钟 demo 配置。格式逐条对齐 SPEC §4。
+#
+# 一句话：把 demo/rugpull_server.py 这个恶意探针包起来，让它的 rug pull 出不了门。
+#
+# 落盘位置全部用 SPEC §8 验收命令里那套真实路径（~/.mcp-guarder/...），
+# 这样 `tail ~/.mcp-guarder/audit/demo-$(date +%F).jsonl` 直接能用。
+# 想跑在临时目录里，把下面 4 个路径改掉即可（store / audit.path / log_file / snapshot_dir）。
+
+version: 1
+
+server:
+  name: demo                  # 审计和指纹的命名空间键，必须稳定
+  transport: stdio            # v1 只认 stdio
+
+defaults:                     # fail-closed 开关，全部保持 SPEC 的默认值
+  on_no_match: deny
+  on_rule_conflict: deny
+  on_detector_error: deny
+  on_audit_write_failure: deny
+  on_unknown_method: passthrough
+  on_upstream_crash: fail
+
+# ── 1. 投毒检测 ──
+inspect:
+  fingerprint:
+    enabled: true
+    store: ~/.mcp-guarder/fingerprints.sqlite
+    fields: [name, title, description, inputSchema]
+    on_first_seen: allow_and_record   # TOFU：第一次见到 echo 记基线
+    on_change: deny_and_alert         # rug pull：描述一变就剥离 + 告警
+  static_checks:
+    enabled: true
+    on_hit: deny                      # 命中即从 tools/list 剥离
+    scan_fields: [name, title, description, inputSchema, annotations]
+    rules:
+      - {id: hidden-instruction-tag, pattern: '(?is)<\s*(IMPORTANT|SYSTEM|SECRET|INSTRUCTIONS)\s*>'}
+      - {id: ignore-previous,   pattern: '(?i)ignore\s+(all\s+)?(previous|prior|above)\s+(instruction|prompt)'}
+      - {id: read-extra-file,   pattern: '(?i)(~/\.ssh/|id_rsa|/\.env\b|~/\.aws/credentials|\.claude\.json)'}
+      - {id: do-not-tell-user,  pattern: "(?i)(do not|don't)\\s+(tell|mention|reveal).{0,40}(user|human)"}
+      - {id: base64-blob,       pattern: '[A-Za-z0-9+/]{200,}={0,2}'}
+      - {id: ansi-escape,       pattern: '\x1b\[[0-9;]*[A-Za-z]'}
+      - {id: cross-server-ref,  pattern: '(?i)\bmcp__[a-z0-9_]+__'}
+
+# ── 2. 权限门：默认拒绝 ──
+policy:
+  rules:
+    # 探针只有 echo 这一个工具。给它一条显式 allow，SPEC §8 第 4 步才会正常回 hello；
+    # 没有这条的话一切 tools/call 都走 no-match deny（那是 SPEC §7 M2-1 的验收场景）。
+    - id: allow-echo
+      tool: echo
+      allow: true
+      when:
+        - {arg: text, exists: true}   # 不带 text 就不算命中 → 落到 no-match → deny
+    # 下面两条探针里没有对应工具，摆在这儿是为了让 demo 配置覆盖 allow 的三态。
+    - id: write-needs-confirm
+      tool: write_file
+      allow: ask                      # v1 一律等价 deny，并往 guard.log 写一行提示
+      when:
+        - {arg: path, starts_with: "${PROJECT_DIR}/"}
+    - id: block-shell
+      tool: "exec_*"                  # glob，不是正则
+      allow: false
+      reason: "shell 执行一律走人工"
+  deny_response:
+    kind: tool_result_error           # 返 result.isError=true，不是 JSON-RPC error
+    text: "mcp-guarder denied: {reason} (rule={rule_id}, event={audit_id})"
+
+# ── 3. 脱敏：出站 arguments + 回流 result 各一道 ──
+redact:
+  enabled: true
+  outbound_scan: [params.arguments]
+  inbound_scan:
+    - result.content[].text
+    - result.content[].resource.text
+    - result.structuredContent
+  action: mask
+  mask_template: "[REDACTED:{rule_id}]"
+  rules:
+    - {id: aws-akid,          pattern: '\bAKIA[0-9A-Z]{16}\b'}
+    - {id: bearer-jwt,        pattern: '\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}'}
+    - {id: openai-key,        pattern: '\bsk-[A-Za-z0-9]{20,}\b'}
+    - {id: github-pat,        pattern: '\bgh[pousr]_[A-Za-z0-9]{36}\b'}
+    - {id: private-key-block, pattern: '-----BEGIN [A-Z ]*PRIVATE KEY-----'}
+  allowlist: ['\bAKIAIOSFODNN7EXAMPLE\b']
+
+# ── 4. 审计 ──
+audit:
+  path: ~/.mcp-guarder/audit/{server}-{date}.jsonl
+  fsync: every_record
+  record: {tools_list: full, tools_call: full, other_methods: metadata_only}
+  payload:
+    max_bytes: 4096
+    store_redacted_only: true         # 铁律：secret 不落盘
+  log_file: ~/.mcp-guarder/guard.log
+  snapshot_dir: ~/.mcp-guarder/snapshots
