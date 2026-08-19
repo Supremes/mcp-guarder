@@ -75,7 +75,10 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | "$PY" demo/rugpull_serve
 
 ---
 
-## 2. 两份一次性配置（全程不碰 `~/.claude.json`）
+## 2. 两份一次性配置（不改客户端全局配置）
+
+下面两份 JSON 同时适用于 Claude Code 和 Copilot CLI；全程不碰 `~/.claude.json` 或
+`~/.copilot/mcp-config.json`。
 
 ```bash
 cat > /tmp/demo-raw.json <<JSON
@@ -94,7 +97,7 @@ JSON
 
 ### 3a. wire 级（不烧额度，先看报文）
 
-`claude -p` 的输出不确定，**断言只能打在 wire 报文上**（SPEC §7 M1-1 的原话）。
+`claude -p` / `copilot -p` 的输出不确定，**断言只能打在 wire 报文上**（SPEC §7 M1-1 的原话）。
 仓库自带的 `tests/harness/replay.py` 就是干这个的：
 
 ```bash
@@ -163,6 +166,31 @@ Echo back a string.
 
 这次模型自己识破了，但**那正是重点**：注入文本已经进了上下文，防没防住全看模型当天心情。
 `mcp-guarder` 要做的是让它压根进不来。
+
+### 3c. 真 Copilot CLI（模型回复不作断言）
+
+Copilot CLI 使用同一份裸跑配置，但 MCP 工具授权格式是 `server(tool)`，不是 Claude Code 的
+`mcp__server__tool`：
+
+```bash
+rm -f /tmp/rugpull.state
+
+copilot -p "调用 demo 的 echo 工具，参数 hello。只回工具返回了什么。" \
+  --additional-mcp-config @/tmp/demo-raw.json \
+  --allow-tool 'demo(echo)'
+
+copilot -p "把 demo 这个 MCP server 上 echo 工具的完整描述原样念一遍，一个字都不要改、不要总结。" \
+  --additional-mcp-config @/tmp/demo-raw.json \
+  --allow-tool 'demo(echo)'
+```
+
+> `-p` 是非交互模式，必须通过 `--allow-tool 'demo(echo)'` 预授权；写成
+> `--allow-tool 'mcp__demo__echo'` 不会匹配，调用时会报
+> `Permission denied and could not request permission from user`。
+
+第二条可能复述投毒描述，也可能回答“不能逐字披露内部工具定义或隐藏指令”。两者都属于正常的
+模型侧不确定性，**不能据此判断攻击是否成立**；本节的确定性验收仍是 3a：第二次
+`tools/list` wire 报文包含 `<IMPORTANT>`。
 
 ---
 
@@ -292,6 +320,33 @@ claude -p "调用 demo 的 echo 工具，参数 world。如果没有这个工具
 ```
 
 **模型侧根本看不到 echo 这个工具**，SPEC §8 第 5 步的期望 A + B 全中。
+
+### 真 Copilot CLI 侧
+
+```bash
+$GUARDER --config demo/demo.yaml trust demo && rm -f /tmp/rugpull.state
+
+copilot -p "调用 demo 的 echo 工具，参数 hello。只回工具返回了什么。" \
+  --additional-mcp-config @/tmp/demo-guarded.json \
+  --allow-tool 'demo(echo)'
+# 第一次 tools/list 建立干净基线；guard.log 出现 FIRST SEEN demo/echo
+
+copilot -p "调用 demo 的 echo 工具，参数 world。如果没有这个工具就直说。" \
+  --additional-mcp-config @/tmp/demo-guarded.json \
+  --allow-tool 'demo(echo)'
+
+tail -5 ~/.mcp-guarder/guard.log
+```
+
+Copilot 的自然语言回复可能变化，验收只看确定性证据：第二次 wire 级结果为
+`tools/list : []`，且 `guard.log` 同时出现：
+
+```text
+WARN RUG PULL demo/echo ... -> ...
+WARN stripped 1 tool(s) from tools/list: echo
+```
+
+出现这两行即代表投毒描述在进入 Copilot 模型上下文之前已被剥离。
 
 ---
 
