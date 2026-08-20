@@ -1,0 +1,412 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1680" height="1520" viewBox="0 0 1680 1520" font-family="'Chalkboard SE','Comic Sans MS','Hanzipen SC','Segoe Print',cursive">
+
+<defs>
+  <filter id="rough" x="-5%" y="-5%" width="110%" height="110%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.022" numOctaves="3" seed="23" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="2.2" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+  <filter id="soft" x="-5%" y="-5%" width="110%" height="110%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="2" seed="17" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="1.3" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+
+  <marker id="aInk" markerWidth="10" markerHeight="10" refX="7.5" refY="5" orient="auto">
+    <path d="M1,1 L8,5 L1,9" fill="none" stroke="#33302B" stroke-width="1.7" stroke-linecap="round"/>
+  </marker>
+  <marker id="aRed" markerWidth="10" markerHeight="10" refX="7.5" refY="5" orient="auto">
+    <path d="M1,1 L8,5 L1,9" fill="none" stroke="#C2453C" stroke-width="1.7" stroke-linecap="round"/>
+  </marker>
+  <marker id="aGrn" markerWidth="10" markerHeight="10" refX="7.5" refY="5" orient="auto">
+    <path d="M1,1 L8,5 L1,9" fill="none" stroke="#4E7C5B" stroke-width="1.7" stroke-linecap="round"/>
+  </marker>
+  <marker id="aBlu" markerWidth="10" markerHeight="10" refX="7.5" refY="5" orient="auto">
+    <path d="M1,1 L8,5 L1,9" fill="none" stroke="#3C6E9E" stroke-width="1.7" stroke-linecap="round"/>
+  </marker>
+</defs>
+
+<style>
+  text { fill:#33302B; }
+  .ink { fill:#33302B; }
+  .red { fill:#C2453C; }
+  .grn { fill:#4E7C5B; }
+  .blu { fill:#3C6E9E; }
+  .amb { fill:#A8730F; }
+  .gry { fill:#8C867D; }
+
+  .sRed { stroke:#C2453C; fill:none; }
+  .sGrn { stroke:#4E7C5B; fill:none; }
+  .sBlu { stroke:#3C6E9E; fill:none; }
+  .sGry { stroke:#B5AEA3; fill:none; }
+  .sAmb { stroke:#D9A441; fill:none; }
+  .sInk { stroke:#33302B; fill:none; }
+
+  .code  { font-family:Menlo,Monaco,monospace; font-size:12px; }
+  .codeb { font-family:Menlo,Monaco,monospace; font-size:12px; font-weight:700; }
+  .xs  { font-size:11.5px; }
+  .sm  { font-size:13px; }
+  .t   { font-size:14.5px; }
+  .tb  { font-size:14.5px; font-weight:700; }
+  .big { font-size:17px; font-weight:700; }
+  .h   { font-size:20px; font-weight:700; }
+  .mid { text-anchor:middle; }
+</style>
+
+<rect width="1680" height="1520" fill="#FDFAF4"/>
+
+<!-- 标题 -->
+<text class="mid" x="840" y="54" font-size="26" font-weight="700" fill="#33302B">mcp-guarder CLI 全命令调用流程</text>
+<text class="mid gry" x="840" y="82" font-size="13.5">src/mcp_guarder/cli.py —— 一个入口，五条分支，一套兜底</text>
+<path d="M520,102 Q840,96 1160,102" class="sGry" stroke-width="2" filter="url(#rough)"/>
+
+<!-- ══ 主干：入口与切分 ══════════════════════════════════════════ -->
+<g filter="url(#soft)">
+  <rect x="560" y="118" width="560" height="56" rx="10" fill="#FBF6EC" stroke="#D9C7A4" stroke-width="2"/>
+  <rect x="670" y="206" width="340" height="52" rx="10" fill="#FFFFFF" stroke="#B5AEA3" stroke-width="2"/>
+</g>
+<text class="mid code" x="840" y="142">$ mcp-guarder [--config PATH] [子命令 | -- &lt;cmd&gt; args...]</text>
+<text class="mid xs gry" x="840" y="162">sys.argv[1:]　或 main(argv) 的显式入参</text>
+
+<path d="M840,174 Q844,190 840,202" class="sInk" stroke-width="2" marker-end="url(#aInk)" filter="url(#rough)"/>
+
+<text class="mid tb" x="840" y="230">main(argv)</text>
+<text class="mid xs gry" x="840" y="249">返回值即进程退出码</text>
+
+<path d="M840,258 Q836,274 840,286" class="sInk" stroke-width="2" marker-end="url(#aInk)" filter="url(#rough)"/>
+
+<!-- split_argv 六边形 -->
+<g filter="url(#rough)">
+  <path d="M662,290 L1018,290 L1040,322 L1018,354 L662,354 L640,322 Z"
+        fill="#E3EFF9" stroke="#3C6E9E" stroke-width="2.4" stroke-linejoin="round"/>
+</g>
+<text class="mid tb blu" x="840" y="317">split_argv(argv)</text>
+<text class="mid xs gry" x="840" y="337">按第一个 `--` 亲手切一刀，不交给 argparse</text>
+
+<!-- 切分的两个产物 -->
+<path d="M640,322 Q598,344 562,388" class="sInk" stroke-width="2" marker-end="url(#aInk)" filter="url(#rough)"/>
+<path d="M1040,322 Q1082,344 1098,388" class="sInk" stroke-width="2" marker-end="url(#aInk)" filter="url(#rough)"/>
+
+<g filter="url(#soft)">
+  <rect x="180" y="364" width="380" height="56" rx="10" fill="#FFFFFF" stroke="#B5AEA3" stroke-width="2"/>
+  <rect x="1100" y="364" width="380" height="56" rx="10" fill="#FDF6E8" stroke="#D9A441" stroke-width="2.4"/>
+</g>
+<text class="mid sm" x="370" y="390">head = 网关自己的参数</text>
+<text class="mid xs gry" x="370" y="409">交给 argparse 解析</text>
+<text class="mid sm amb" x="1290" y="390">command = `--` 之后的一切</text>
+<text class="mid xs red" x="1290" y="409">一个字节都不解析，原样透传子进程</text>
+
+<path d="M840,354 Q844,375 840,392" class="sInk" stroke-width="2" marker-end="url(#aInk)" filter="url(#rough)"/>
+
+<g filter="url(#soft)">
+  <rect x="660" y="396" width="360" height="52" rx="10" fill="#FFFFFF" stroke="#B5AEA3" stroke-width="2"/>
+</g>
+<text class="mid tb" x="840" y="420">build_parser().parse_args(head)</text>
+<text class="mid xs gry" x="840" y="439">--config / --version / 子命令表</text>
+
+<!-- 两条失败旁路 -->
+<path d="M1020,422 Q1100,430 1176,462" class="sRed" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#aRed)" filter="url(#rough)"/>
+<path d="M990,524 Q1085,527 1176,530" class="sRed" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#aRed)" filter="url(#rough)"/>
+
+<g filter="url(#soft)">
+  <rect x="1180" y="440" width="400" height="52" rx="10" fill="#FCF2F1" stroke="#C2453C" stroke-width="2.4"/>
+  <rect x="1180" y="506" width="400" height="52" rx="10" fill="#FCF2F1" stroke="#C2453C" stroke-width="2.4"/>
+</g>
+<text class="code red" x="1200" y="464">except SystemExit</text>
+<text class="xs gry" x="1212" y="483">└→ argparse 已把 usage 打进 stderr，原样返回它的 code</text>
+<text class="code red" x="1200" y="530">子命令 + 尾随命令 同时出现</text>
+<text class="xs gry" x="1212" y="549">└→ `--` 只在代理模式合法 → exit 2</text>
+
+<!-- 分派菱形 -->
+<g filter="url(#rough)">
+  <path d="M840,480 L990,524 L840,568 L690,524 Z"
+        fill="#EFEAE0" stroke="#33302B" stroke-width="2.4" stroke-linejoin="round"/>
+</g>
+<text class="mid tb" x="840" y="520">args.command ?</text>
+<text class="mid xs gry" x="840" y="539">分派五条路</text>
+
+<!-- 分派母线 -->
+<path d="M840,568 Q844,582 840,594" class="sInk" stroke-width="2" filter="url(#rough)"/>
+<path d="M193,596 Q840,590 1486,598" class="sInk" stroke-width="2" filter="url(#rough)"/>
+<g filter="url(#rough)">
+  <path d="M193,596 Q196,606 193,616" class="sBlu" stroke-width="2" marker-end="url(#aBlu)"/>
+  <path d="M516,594 Q519,605 516,616" class="sGrn" stroke-width="2" marker-end="url(#aGrn)"/>
+  <path d="M840,592 Q843,604 840,616" class="sAmb" stroke-width="2" marker-end="url(#aInk)"/>
+  <path d="M1163,594 Q1166,605 1163,616" class="sGry" stroke-width="2" marker-end="url(#aInk)"/>
+  <path d="M1486,598 Q1489,607 1486,616" class="sGry" stroke-width="2" marker-end="url(#aInk)"/>
+</g>
+
+<!-- ══ 五条分支 ═══════════════════════════════════════════════════ -->
+
+<!-- ① 代理模式（蓝 = 方案 / 机制） -->
+<g filter="url(#rough)">
+  <rect x="40" y="620" width="307" height="480" rx="12" fill="#F1F6FB" stroke="#3C6E9E" stroke-width="2.4"/>
+</g>
+<g filter="url(#soft)">
+  <path d="M40,632 a12,12 0 0 1 12,-12 h283 a12,12 0 0 1 12,12 v32 h-307 z" fill="#E3EFF9" stroke="#3C6E9E" stroke-width="2"/>
+  <rect x="52" y="696" width="283" height="48" rx="8" fill="#FFFFFF" stroke="#B5AEA3" stroke-width="1.8"/>
+  <rect x="52" y="756" width="283" height="48" rx="8" fill="#FFFFFF" stroke="#B5AEA3" stroke-width="1.8"/>
+  <rect x="52" y="816" width="283" height="48" rx="8" fill="#FFFFFF" stroke="#B5AEA3" stroke-width="1.8"/>
+  <rect x="52" y="876" width="283" height="48" rx="8" fill="#FFFFFF" stroke="#B5AEA3" stroke-width="1.8"/>
+  <rect x="52" y="936" width="283" height="48" rx="8" fill="#FFFFFF" stroke="#B5AEA3" stroke-width="1.8"/>
+  <rect x="52" y="996" width="283" height="48" rx="8" fill="#FFFFFF" stroke="#B5AEA3" stroke-width="1.8"/>
+  <rect x="62" y="1054" width="263" height="40" rx="8" fill="#E3EFF9" stroke="#3C6E9E" stroke-width="2"/>
+</g>
+<text class="mid tb blu" x="193" y="649">① 代理模式</text>
+<text class="mid xs gry" x="193" y="684">command is None → cmd_proxy()　长驻进程</text>
+
+<text class="code" x="66" y="716">command 为空？</text>
+<text class="xs red" x="78" y="734">└→ 是 → USAGE 进 stderr，exit 2</text>
+
+<text class="code" x="66" y="776">resolve_config(--config)</text>
+<text class="xs gry" x="78" y="794">└→ load_yaml → parse → validate</text>
+
+<text class="code" x="66" y="836">proxy.run_proxy(cfg, command)</text>
+<text class="xs gry" x="78" y="854">└→ 建 GuardLog / AuditLogger / 指纹库</text>
+
+<text class="code" x="66" y="896">audit.open() + store.open()</text>
+<text class="xs red" x="78" y="914">└→ 任一失败 → exit 4 ／ exit 2</text>
+
+<text class="code" x="66" y="956">Proxy.run()　双向泵 A ⇄ B</text>
+<text class="xs gry" x="78" y="974">└→ 起子进程 → banner → 转发 + 检测</text>
+
+<text class="code" x="66" y="1016">finally: close 三件套</text>
+<text class="xs red" x="78" y="1034">└→ 泵 A 卡死 → _hard_exit(os._exit)</text>
+
+<text class="mid big blu" x="193" y="1080">stdout 一字节不多写</text>
+
+<!-- ② diff（绿 = 正常 / 诊断） -->
+<g filter="url(#rough)">
+  <rect x="363" y="620" width="307" height="480" rx="12" fill="#F2F8F4" stroke="#4E7C5B" stroke-width="2.4"/>
+</g>
+<g filter="url(#soft)">
+  <path d="M363,632 a12,12 0 0 1 12,-12 h283 a12,12 0 0 1 12,12 v32 h-307 z" fill="#DFEDE4" stroke="#4E7C5B" stroke-width="2"/>
+  <rect x="375" y="696" width="283" height="48" rx="8" fill="#FFFFFF" stroke="#B5AEA3" stroke-width="1.8"/>
+  <rect x="375" y="756" width="283" height="48" rx="8" fill="#FFFFFF" stroke="#B5AEA3" stroke-width="1.8"/>
+  <rect x="375" y="816" width="283" height="48" rx="8" fill="#FFFFFF" stroke="#B5AEA3" stroke-width="1.8"/>
+  <rect x="375" y="876" width="283" height="48" rx="8" fill="#FFFFFF" stroke="#B5AEA3" stroke-width="1.8"/>
+  <rect x="375" y="936" width="283" height="48" rx="8" fill="#FFFFFF" stroke="#B5AEA3" stroke-width="1.8"/>
+  <rect x="375" y="996" width="283" height="48" rx="8" fill="#FFFFFF" stroke="#B5AEA3" stroke-width="1.8"/>
+  <rect x="385" y="1054" width="263" height="40" rx="8" fill="#DFEDE4" stroke="#4E7C5B" stroke-width="2"/>
+</g>
+<text class="mid tb grn" x="516" y="649">② diff &lt;server&gt; &lt;tool&gt;</text>
+<text class="mid xs gry" x="516" y="684">cmd_diff()　投毒前后逐行对照</text>
+
+<text class="code" x="389" y="716">resolve_config(--config)</text>
+<text class="xs gry" x="401" y="734">└→ 拿指纹库 + 快照目录</text>
+
+<text class="code" x="389" y="776">store.get(server, tool)</text>
+<text class="xs red" x="401" y="794">└→ 无已信任指纹 → exit 1</text>
+
+<text class="code" x="389" y="836">load_tool_snapshot(信任版)</text>
+<text class="xs red" x="401" y="854">└→ 快照缺失 → exit 1</text>
+
+<text class="code" x="389" y="896">_latest_other_snapshot()</text>
+<text class="xs gry" x="401" y="914">└→ 按 mtime 取最新「非信任」快照</text>
+
+<text class="code" x="389" y="956">difflib.unified_diff(...)</text>
+<text class="xs gry" x="401" y="974">└→ trusted 4f2a… ↔ current 9b71…</text>
+
+<text class="code" x="389" y="1016">print(visible_escape(line))</text>
+<text class="xs amb" x="401" y="1034">└→ 先转义 ANSI，别被 diff 反噬终端</text>
+
+<text class="mid big grn" x="516" y="1080">只读诊断，零副作用</text>
+
+<!-- ③ trust（琥珀 = 副作用 / 警告） -->
+<g filter="url(#rough)">
+  <rect x="686" y="620" width="307" height="480" rx="12" fill="#FDF6E8" stroke="#D9A441" stroke-width="2.6"/>
+</g>
+<g filter="url(#soft)">
+  <path d="M686,632 a12,12 0 0 1 12,-12 h283 a12,12 0 0 1 12,12 v32 h-307 z" fill="#F8E9CE" stroke="#D9A441" stroke-width="2"/>
+  <rect x="698" y="696" width="283" height="48" rx="8" fill="#FFFFFF" stroke="#B5AEA3" stroke-width="1.8"/>
+  <rect x="698" y="756" width="283" height="48" rx="8" fill="#FFFFFF" stroke="#B5AEA3" stroke-width="1.8"/>
+  <rect x="698" y="816" width="283" height="48" rx="8" fill="#FFFFFF" stroke="#B5AEA3" stroke-width="1.8"/>
+  <rect x="698" y="876" width="283" height="48" rx="8" fill="#FFFFFF" stroke="#B5AEA3" stroke-width="1.8"/>
+  <rect x="698" y="936" width="283" height="48" rx="8" fill="#FFFFFF" stroke="#B5AEA3" stroke-width="1.8"/>
+  <rect x="698" y="996" width="283" height="48" rx="8" fill="#F6DEDB" stroke="#C2453C" stroke-width="2.2"/>
+  <rect x="708" y="1054" width="263" height="40" rx="8" fill="#F8E9CE" stroke="#D9A441" stroke-width="2"/>
+</g>
+<text class="mid tb amb" x="840" y="649">③ trust &lt;server&gt; [tool]</text>
+<text class="mid xs gry" x="840" y="684">cmd_trust()　唯一会改写信任状态</text>
+
+<text class="code" x="712" y="716">resolve_config(--config)</text>
+<text class="xs gry" x="724" y="734">└→ 定位 fingerprints.sqlite</text>
+
+<text class="code" x="712" y="776">store.delete(server, tool?)</text>
+<text class="xs gry" x="724" y="794">└→ 不传 tool 就清整个 server</text>
+
+<text class="code" x="712" y="836">下次 tools/list 重走 TOFU</text>
+<text class="xs gry" x="724" y="854">└→ 唯一的「接受升级」出口</text>
+
+<text class="code" x="712" y="896">GuardLog(also_stderr=False)</text>
+<text class="xs gry" x="724" y="914">└→ .warn("TRUST …") 信任操作留痕</text>
+
+<text class="code" x="712" y="956">print("deleted N row(s)")</text>
+<text class="xs gry" x="724" y="974">└→ stdout 给人看 → exit 0</text>
+
+<text class="codeb red" x="712" y="1016">✗ 顺序反了 = 网关白装</text>
+<text class="xs red" x="724" y="1034">└→ 先 diff 看清，确认是升级再 trust</text>
+
+<text class="mid big amb" x="840" y="1080">删指纹 = 解除警报</text>
+
+<!-- ④ audit tail（白卡 = 旁路只读） -->
+<g filter="url(#rough)">
+  <rect x="1009" y="620" width="307" height="480" rx="12" fill="#FFFFFF" stroke="#B5AEA3" stroke-width="2"/>
+</g>
+<g filter="url(#soft)">
+  <path d="M1009,632 a12,12 0 0 1 12,-12 h283 a12,12 0 0 1 12,12 v32 h-307 z" fill="#EFEAE0" stroke="#B5AEA3" stroke-width="2"/>
+  <rect x="1021" y="696" width="283" height="48" rx="8" fill="#FBF6EC" stroke="#D9C7A4" stroke-width="1.8"/>
+  <rect x="1021" y="756" width="283" height="48" rx="8" fill="#FBF6EC" stroke="#D9C7A4" stroke-width="1.8"/>
+  <rect x="1021" y="816" width="283" height="48" rx="8" fill="#FBF6EC" stroke="#D9C7A4" stroke-width="1.8"/>
+  <rect x="1021" y="876" width="283" height="48" rx="8" fill="#FBF6EC" stroke="#D9C7A4" stroke-width="1.8"/>
+  <rect x="1021" y="936" width="283" height="48" rx="8" fill="#FBF6EC" stroke="#D9C7A4" stroke-width="1.8"/>
+  <rect x="1021" y="996" width="283" height="48" rx="8" fill="#FBF6EC" stroke="#D9C7A4" stroke-width="1.8"/>
+  <rect x="1031" y="1054" width="263" height="40" rx="8" fill="#EFEAE0" stroke="#B5AEA3" stroke-width="2"/>
+</g>
+<text class="mid tb" x="1163" y="649">④ audit tail [-n N] [-f]</text>
+<text class="mid xs gry" x="1163" y="684">cmd_audit_tail()　默认 20 条</text>
+
+<text class="code" x="1035" y="716">resolve_config(--config)</text>
+<text class="xs gry" x="1047" y="734">└→ 拿 audit.path 与分文件规则</text>
+
+<text class="code" x="1035" y="776">server = --server ?? cfg.server</text>
+<text class="xs gry" x="1047" y="794">└→ 决定读哪一组 jsonl</text>
+
+<text class="code" x="1035" y="836">audit_files_for(cfg.audit, srv)</text>
+<text class="xs red" x="1047" y="854">└→ 一个文件都没有 → exit 1</text>
+
+<text class="code" x="1035" y="896">tail_records(paths, n, follow)</text>
+<text class="xs gry" x="1047" y="914">└→ -f 用 0.5s 轮询，不引第三方库</text>
+
+<text class="code" x="1035" y="956">format_record(rec, verbose)</text>
+<text class="xs gry" x="1047" y="974">└→ -v 展开 payload_preview</text>
+
+<text class="code" x="1035" y="1016">print(...) → exit 0</text>
+<text class="xs gry" x="1047" y="1034">└→ Ctrl-C 被吞掉，也算正常收尾</text>
+
+<text class="mid big ink" x="1163" y="1080">调代理时的主力窗口</text>
+
+<!-- ⑤ audit grep（白卡 = 旁路只读） -->
+<g filter="url(#rough)">
+  <rect x="1332" y="620" width="307" height="480" rx="12" fill="#FFFFFF" stroke="#B5AEA3" stroke-width="2"/>
+</g>
+<g filter="url(#soft)">
+  <path d="M1332,632 a12,12 0 0 1 12,-12 h283 a12,12 0 0 1 12,12 v32 h-307 z" fill="#EFEAE0" stroke="#B5AEA3" stroke-width="2"/>
+  <rect x="1344" y="696" width="283" height="48" rx="8" fill="#FBF6EC" stroke="#D9C7A4" stroke-width="1.8"/>
+  <rect x="1344" y="756" width="283" height="48" rx="8" fill="#FBF6EC" stroke="#D9C7A4" stroke-width="1.8"/>
+  <rect x="1344" y="816" width="283" height="48" rx="8" fill="#FBF6EC" stroke="#D9C7A4" stroke-width="1.8"/>
+  <rect x="1344" y="876" width="283" height="48" rx="8" fill="#FBF6EC" stroke="#D9C7A4" stroke-width="1.8"/>
+  <rect x="1344" y="936" width="283" height="108" rx="8" fill="#EFEAE0" stroke="#B5AEA3" stroke-width="1.8"/>
+  <rect x="1354" y="1054" width="263" height="40" rx="8" fill="#EFEAE0" stroke="#B5AEA3" stroke-width="2"/>
+</g>
+<text class="mid tb" x="1486" y="649">⑤ audit grep &lt;pattern&gt;</text>
+<text class="mid xs gry" x="1486" y="684">cmd_audit_grep()　正则查历史</text>
+
+<text class="code" x="1358" y="716">resolve_config(--config)</text>
+<text class="xs gry" x="1370" y="734">└→ 与 tail 完全同源</text>
+
+<text class="code" x="1358" y="776">audit_files_for(cfg.audit, srv)</text>
+<text class="xs red" x="1370" y="794">└→ 没有文件 → exit 1</text>
+
+<text class="code" x="1358" y="836">grep_records(paths, pattern)</text>
+<text class="xs gry" x="1370" y="854">└→ 正则匹配「整行原文」，非字段</text>
+
+<text class="code" x="1358" y="896">format_record(rec, verbose)</text>
+<text class="xs gry" x="1370" y="914">└→ 命中即打印，边扫边出</text>
+
+<text class="codeb grn" x="1358" y="958">✓ 有命中 → exit 0</text>
+<text class="codeb red" x="1358" y="978">✗ 无命中 → exit 1</text>
+<text class="xs gry" x="1370" y="998">└→ 退出码可直接做 shell 断言</text>
+<text class="xs gry" x="1370" y="1018">└→ ④⑤ 只读 jsonl，不开指纹库、</text>
+<text class="xs gry" x="1382" y="1036">不碰上游，代理跑着也安全</text>
+
+<text class="mid big ink" x="1486" y="1080">安全的旁路观察窗</text>
+
+<!-- ══ 底部：兜底 / 退出码 / 洞察 ══════════════════════════════════ -->
+
+<!-- 兜底 -->
+<g filter="url(#rough)">
+  <rect x="40" y="1120" width="760" height="280" rx="12" fill="#FCF2F1" stroke="#C2453C" stroke-width="2.4"/>
+</g>
+<text class="h red" x="64" y="1152">main() 顶层 try / except</text>
+<text class="xs gry" x="64" y="1174">一张网兜住上面全部五条分支：任何异常都不许走到 stdout —— 代理模式下一段 traceback 就能撑爆客户端的 JSON 解析。</text>
+
+<g filter="url(#soft)">
+  <rect x="64" y="1188" width="340" height="54" rx="8" fill="#FFFFFF" stroke="#B5AEA3" stroke-width="1.8"/>
+  <rect x="420" y="1188" width="340" height="54" rx="8" fill="#FFFFFF" stroke="#B5AEA3" stroke-width="1.8"/>
+  <rect x="64" y="1252" width="340" height="54" rx="8" fill="#FFFFFF" stroke="#B5AEA3" stroke-width="1.8"/>
+  <rect x="420" y="1252" width="340" height="54" rx="8" fill="#F6DEDB" stroke="#C2453C" stroke-width="2.2"/>
+  <rect x="64" y="1320" width="696" height="72" rx="8" fill="#FBF6EC" stroke="#D9C7A4" stroke-width="2"/>
+</g>
+<text class="code" x="80" y="1210">except ConfigError</text>
+<text class="xs gry" x="92" y="1230">└→ eprint(format_report()) → exit 2</text>
+<text class="code" x="436" y="1210">except GuarderError</text>
+<text class="xs gry" x="448" y="1230">└→ eprint("[mcp-guarder] …") → exc.exit_code</text>
+<text class="code" x="80" y="1274">except KeyboardInterrupt</text>
+<text class="xs gry" x="92" y="1294">└→ 安静收场 → exit 0</text>
+<text class="code red" x="436" y="1274">except BaseException</text>
+<text class="xs red" x="448" y="1294">└→ traceback.print_exc(stderr) → exit 1</text>
+
+<text class="tb" x="80" y="1342">三条输出通道，永不混用</text>
+<text class="codeb blu" x="80" y="1364">stdout</text>
+<text class="xs gry" x="146" y="1364">代理模式只有 JSON-RPC 报文；子命令才是给人看的结果</text>
+<text class="codeb amb" x="80" y="1384">stderr</text>
+<text class="xs gry" x="146" y="1384">eprint / 启动横幅 / WARN / traceback —— 代理模式唯一的人类通道</text>
+
+<!-- 退出码 -->
+<g filter="url(#rough)">
+  <rect x="816" y="1120" width="380" height="280" rx="12" fill="#FBF6EC" stroke="#D9C7A4" stroke-width="2.4"/>
+</g>
+<text class="mid h" x="1006" y="1152">退出码 = 唯一对外契约</text>
+<path d="M836,1166 Q1006,1161 1176,1166" class="sGry" stroke-width="2" filter="url(#rough)"/>
+
+<g filter="url(#soft)">
+  <rect x="836" y="1180" width="44" height="30" rx="8" fill="#DFEDE4" stroke="#4E7C5B" stroke-width="2"/>
+  <rect x="836" y="1222" width="44" height="30" rx="8" fill="#F6DEDB" stroke="#C2453C" stroke-width="2"/>
+  <rect x="836" y="1264" width="44" height="30" rx="8" fill="#F6DEDB" stroke="#C2453C" stroke-width="2"/>
+  <rect x="836" y="1306" width="44" height="30" rx="8" fill="#F6DEDB" stroke="#C2453C" stroke-width="2"/>
+  <rect x="836" y="1348" width="44" height="30" rx="8" fill="#F6DEDB" stroke="#C2453C" stroke-width="2"/>
+</g>
+<text class="mid tb grn" x="858" y="1201">0</text>
+<text class="mid tb red" x="858" y="1243">1</text>
+<text class="mid tb red" x="858" y="1285">2</text>
+<text class="mid tb red" x="858" y="1327">3</text>
+<text class="mid tb red" x="858" y="1369">4</text>
+
+<text class="code grn" x="892" y="1194">EXIT_OK</text>
+<text class="xs gry" x="892" y="1210">正常收场（含 Ctrl-C）</text>
+<text class="code" x="892" y="1236">EXIT_GENERIC_ERROR</text>
+<text class="xs gry" x="892" y="1252">找不到指纹·快照·审计；grep 无命中</text>
+<text class="code" x="892" y="1278">EXIT_CONFIG_ERROR</text>
+<text class="xs gry" x="892" y="1294">配置读不了或校验不过 → 拒绝启动</text>
+<text class="code" x="892" y="1320">EXIT_UPSTREAM_CRASH</text>
+<text class="xs gry" x="892" y="1336">子进程拉不起来或中途死掉</text>
+<text class="code" x="892" y="1362">EXIT_AUDIT_UNAVAILABLE</text>
+<text class="xs gry" x="892" y="1378">审计写不了 → fail-closed，不带病开跑</text>
+
+<!-- 洞察 -->
+<g filter="url(#rough)">
+  <rect x="1212" y="1120" width="428" height="280" rx="12" fill="#FBF6EC" stroke="#D9C7A4" stroke-width="2.4"/>
+</g>
+<text class="h" x="1236" y="1152">一句话看懂这张图</text>
+<text class="xs gry" x="1236" y="1172">五条分支其实分成性质完全不同的两类。</text>
+
+<g filter="url(#soft)">
+  <rect x="1236" y="1184" width="380" height="100" rx="8" fill="#E3EFF9" stroke="#3C6E9E" stroke-width="2"/>
+  <rect x="1236" y="1294" width="380" height="98" rx="8" fill="#DFEDE4" stroke="#4E7C5B" stroke-width="2"/>
+</g>
+<text class="t blu" x="1252" y="1207">① 代理模式 = 长驻的数据平面</text>
+<text class="xs gry" x="1252" y="1229">stdout 被协议征用，起子进程 / 开审计 / 开指纹库，</text>
+<text class="xs gry" x="1252" y="1249">全程 fail-closed：任何一环建不起来，</text>
+<text class="xs gry" x="1252" y="1269">宁可退出也不放行。</text>
+
+<text class="t grn" x="1252" y="1317">②③④⑤ = 一次性的控制平面</text>
+<text class="xs gry" x="1252" y="1339">跑完就退，stdout 还给人类；都以 resolve_config 起手，</text>
+<text class="xs gry" x="1252" y="1359">配置是五条分支唯一的公共入口。</text>
+<text class="xs gry" x="1252" y="1379">其中只有 ③ trust 会写库。</text>
+
+<!-- ══ 底部结论胶囊 ═══════════════════════════════════════════════ -->
+<g filter="url(#rough)">
+  <rect x="40" y="1424" width="1600" height="52" rx="26" fill="#FDF3E2" stroke="#D9A441" stroke-width="2.4"/>
+</g>
+<text class="mid big amb" x="840" y="1456">根源：stdout 是全局唯一的稀缺通道 —— 代理模式把它整条让给了协议，于是所有人类可读信息只能改道 stderr、guard.log 与 audit jsonl</text>
+
+</svg>
