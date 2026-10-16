@@ -36,3 +36,6 @@ snapshots/
 .DS_Store
 .idea/
 .vscode/
+
+# 评测数据本地缓存（MCPTox 无 LICENSE，不进仓库）
+eval/.cache/
