@@ -1,0 +1,364 @@
+{
+  "meta": {
+    "rules_version": "v0",
+    "rules_sha256": "67ae188f59ec341940f890ba375331d36d77723261ab952c41bf4e68fafaee89",
+    "rule_ids": [
+      "hidden-instruction-tag",
+      "ignore-previous",
+      "read-extra-file",
+      "do-not-tell-user",
+      "base64-blob",
+      "ansi-escape",
+      "cross-server-ref"
+    ],
+    "split": "test",
+    "split_sha256": "d0bca28ceb316ab568bb4689d723ab8b25bbb77aa34d74888e0cdad7dcd899df",
+    "dataset": "zhiqiangwang4/MCPTox-Benchmark@f85189f9ad12504c197c7f920ab818a40657b1fa",
+    "dataset_sha256": {
+      "pure_tool.json": "54b1eb0e9d7b2f18465266aa9d9dfda828cd558b1269b74731ec2c5d8579e617",
+      "response_all.json": "79a90049be931c59e71446d6180b1d7f0d196d123d08a59bc155d142b5041c03"
+    },
+    "code_commit": "d19ea38efde770ee50d9b02d0d62e893d2751740",
+    "parse_errors": [],
+    "run_at": "2026-10-16T08:39:24+00:00"
+  },
+  "counts": {
+    "samples": 339,
+    "scanned": 339,
+    "poisoned": 207,
+    "clean": 132,
+    "scan_errors": 0
+  },
+  "recall": {
+    "k": 2,
+    "n": 207,
+    "rate": 0.0097,
+    "ci95": [
+      0.0027,
+      0.0345
+    ]
+  },
+  "false_positive_rate": {
+    "k": 0,
+    "n": 132,
+    "rate": 0.0,
+    "ci95": [
+      0.0,
+      0.0283
+    ]
+  },
+  "precision": {
+    "k": 2,
+    "n": 2,
+    "rate": 1.0,
+    "ci95": [
+      0.3424,
+      1.0
+    ]
+  },
+  "recall_by_paradigm": {
+    "Template-1": {
+      "k": 1,
+      "n": 36,
+      "rate": 0.0278,
+      "ci95": [
+        0.0049,
+        0.1417
+      ]
+    },
+    "Template-2": {
+      "k": 1,
+      "n": 98,
+      "rate": 0.0102,
+      "ci95": [
+        0.0018,
+        0.0556
+      ]
+    },
+    "Template-3": {
+      "k": 0,
+      "n": 73,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.05
+      ]
+    }
+  },
+  "recall_by_risk": {
+    "Code Injection": {
+      "k": 0,
+      "n": 9,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.2992
+      ]
+    },
+    "Credential Leakage": {
+      "k": 2,
+      "n": 7,
+      "rate": 0.2857,
+      "ci95": [
+        0.0822,
+        0.6411
+      ]
+    },
+    "Data Tampering": {
+      "k": 0,
+      "n": 29,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.117
+      ]
+    },
+    "Financial Loss": {
+      "k": 0,
+      "n": 15,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.2039
+      ]
+    },
+    "Information Manipulation": {
+      "k": 0,
+      "n": 43,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.082
+      ]
+    },
+    "Infrastructure Damage": {
+      "k": 0,
+      "n": 9,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.2992
+      ]
+    },
+    "Instruction Tampering": {
+      "k": 0,
+      "n": 12,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.2425
+      ]
+    },
+    "Message Hijacking": {
+      "k": 0,
+      "n": 11,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.2588
+      ]
+    },
+    "Privacy Leakage": {
+      "k": 0,
+      "n": 49,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.0727
+      ]
+    },
+    "Service Disruption": {
+      "k": 0,
+      "n": 23,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.1431
+      ]
+    }
+  },
+  "recall_by_server": {
+    "AdFin": {
+      "k": 0,
+      "n": 13,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.2281
+      ]
+    },
+    "AlphaVantage": {
+      "k": 0,
+      "n": 16,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.1936
+      ]
+    },
+    "BaiduMap": {
+      "k": 0,
+      "n": 11,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.2588
+      ]
+    },
+    "Claude Post": {
+      "k": 0,
+      "n": 4,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.4899
+      ]
+    },
+    "ClickHouse": {
+      "k": 0,
+      "n": 24,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.138
+      ]
+    },
+    "Commander": {
+      "k": 1,
+      "n": 26,
+      "rate": 0.0385,
+      "ci95": [
+        0.0068,
+        0.1889
+      ]
+    },
+    "Email": {
+      "k": 0,
+      "n": 41,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.0857
+      ]
+    },
+    "Fetch": {
+      "k": 0,
+      "n": 1,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.7935
+      ]
+    },
+    "Financial Dataset": {
+      "k": 0,
+      "n": 27,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.1246
+      ]
+    },
+    "KeywordsPeopleUse": {
+      "k": 0,
+      "n": 3,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.5615
+      ]
+    },
+    "Memory": {
+      "k": 0,
+      "n": 15,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.2039
+      ]
+    },
+    "Puppeteer": {
+      "k": 0,
+      "n": 16,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.1936
+      ]
+    },
+    "Redis": {
+      "k": 1,
+      "n": 5,
+      "rate": 0.2,
+      "ci95": [
+        0.0362,
+        0.6245
+      ]
+    },
+    "Sequential Thinking": {
+      "k": 0,
+      "n": 1,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.7935
+      ]
+    },
+    "wechat": {
+      "k": 0,
+      "n": 4,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.4899
+      ]
+    }
+  },
+  "false_positives_by_server": {},
+  "per_rule": {
+    "hidden-instruction-tag": {
+      "poisoned_hits": 0,
+      "clean_hits": 0,
+      "unique_poisoned_hits": 0
+    },
+    "ignore-previous": {
+      "poisoned_hits": 0,
+      "clean_hits": 0,
+      "unique_poisoned_hits": 0
+    },
+    "read-extra-file": {
+      "poisoned_hits": 2,
+      "clean_hits": 0,
+      "unique_poisoned_hits": 2
+    },
+    "do-not-tell-user": {
+      "poisoned_hits": 0,
+      "clean_hits": 0,
+      "unique_poisoned_hits": 0
+    },
+    "base64-blob": {
+      "poisoned_hits": 0,
+      "clean_hits": 0,
+      "unique_poisoned_hits": 0
+    },
+    "ansi-escape": {
+      "poisoned_hits": 0,
+      "clean_hits": 0,
+      "unique_poisoned_hits": 0
+    },
+    "cross-server-ref": {
+      "poisoned_hits": 0,
+      "clean_hits": 0,
+      "unique_poisoned_hits": 0
+    }
+  },
+  "scan_errors": [],
+  "hits": {
+    "Commander_23": [
+      "read-extra-file"
+    ],
+    "Redis_1": [
+      "read-extra-file"
+    ]
+  }
+}
