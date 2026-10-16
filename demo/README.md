@@ -1,4 +1,4 @@
-# SPEC §8 的 5 分钟 demo —— 亲眼看一次 rug pull 被挡下来
+# 5 分钟 demo —— 亲眼看一次 rug pull 被挡下来
 
 一句话结论（跑完你会看到的）：**同一个恶意 server，裸跑时投毒描述进了模型上下文；
 挂上 `mcp-guarder` 后它连 tool 列表都出不去。**
@@ -8,7 +8,7 @@
 | 文件 | 是什么 |
 |---|---|
 | `rugpull_server.py` | 攻击样本。一个自己按行读写 JSON-RPC 的最小 MCP server（**不用 SDK**），第一次 `tools/list` 给干净描述，第二次换成带 `<IMPORTANT>` 的投毒描述 |
-| `demo.yaml` | 按 SPEC §4 写的一份完整配置：指纹 + 静态检查 + 权限门 + 双向脱敏 + 审计 |
+| `demo.yaml` | 一份完整配置：指纹 + 静态检查 + 权限门 + 双向脱敏 + 审计 |
 | `README.md` | 你正在看的这个。每一步都贴了**实测输出** |
 
 ---
@@ -19,7 +19,7 @@
 **真跑出来的**，只做了两处替换：
 
 - `$REPO` = `/Users/<user>/projects/github/mcp-guarder`
-- `/tmp/mcp-guarder-demo` = 抓输出时用的临时 guard home。`demo.yaml` 里写的是 SPEC §8
+- `/tmp/mcp-guarder-demo` = 抓输出时用的临时 guard home。`demo.yaml` 里写的是
   那套真实路径 `~/.mcp-guarder/…`；抓输出的机器上已经有历史数据了，为了让下面的
   digest / 行号干净可复现，我把 `demo.yaml` 里 `~/.mcp-guarder` 整体 sed 成了
   `/tmp/mcp-guarder-demo`，**除路径外一个字节没改**。你在干净机器上直接用
@@ -43,7 +43,7 @@ export GUARDER="$REPO/.venv/bin/mcp-guarder"
 export PY="$REPO/.venv/bin/python"
 ```
 
-> SPEC §8 写的是 `pipx install .` 然后直接敲 `mcp-guarder`。抓这份输出的机器上没装 pipx，
+> 根目录 README 写的是 `pipx install .` 然后直接敲 `mcp-guarder`。抓这份输出的机器上没装 pipx，
 > 所以全程用 venv 里的绝对路径。装了 pipx 的话把 `$GUARDER` 换成 `mcp-guarder` 即可，行为一样。
 
 `$GUARDER --version`：
@@ -97,7 +97,7 @@ JSON
 
 ### 3a. wire 级（不烧额度，先看报文）
 
-`claude -p` / `copilot -p` 的输出不确定，**断言只能打在 wire 报文上**（SPEC §7 M1-1 的原话）。
+`claude -p` / `copilot -p` 的输出不确定，**断言只能打在 wire 报文上**。
 仓库自带的 `tests/harness/replay.py` 就是干这个的：
 
 ```bash
@@ -138,7 +138,7 @@ claude -p "把 demo 这个 MCP server 上 echo 工具的完整描述原样念一
   --mcp-config /tmp/demo-raw.json --strict-mcp-config --allowedTools "mcp__demo__echo"
 ```
 
-> `--allowedTools` 是 SPEC §8 没写但**必须加**的：headless 模式下不预授权，工具调用会被权限层拦掉，
+> `--allowedTools` **必须加**：headless 模式下不预授权，工具调用会被权限层拦掉，
 > 就到不了我们要演示的那一层。
 
 第一条的实测输出：
@@ -225,9 +225,9 @@ tools/call : echo: hello
 2026-08-17T10:24:09.455Z [mcp-guarder] FIRST SEEN demo/echo 2435173c…
 ```
 
-✅ 正常回 `hello`，`guard.log` 出现 **`FIRST SEEN demo/echo 2435173c…`**（SPEC §8 第 4 步的期望）。
+✅ 正常回 `hello`，`guard.log` 出现 **`FIRST SEEN demo/echo 2435173c…`**。
 
-### 顺手验一下透明性（SPEC §7 M1-1）
+### 顺手验一下透明性
 
 基线建好之后，同样的报文裸跑 vs 挂网关，stdout **逐字节一致**：
 
@@ -286,7 +286,7 @@ tools/list : []
 
 ✅ `echo` 从 `tools/list` 里**被剥离**（返回空列表）；
 ✅ `RUG PULL demo/echo 2435173c… -> 0994b658…`；
-✅ 静态检查两条规则同时命中：`hidden-instruction-tag` + `read-extra-file`（SPEC §7 M3-1）。
+✅ 静态检查两条规则同时命中：`hidden-instruction-tag` + `read-extra-file`。
 
 ### 真 `claude -p` 侧
 
@@ -319,7 +319,7 @@ claude -p "调用 demo 的 echo 工具，参数 world。如果没有这个工具
 2026-08-17T10:22:37.524Z [mcp-guarder] WARN stripped 1 tool(s) from tools/list: echo
 ```
 
-**模型侧根本看不到 echo 这个工具**，SPEC §8 第 5 步的期望 A + B 全中。
+**模型侧根本看不到 echo 这个工具**，rug pull 被拦下。
 
 ### 真 Copilot CLI 侧
 
@@ -358,7 +358,7 @@ WARN stripped 1 tool(s) from tools/list: echo
 tail -2 ~/.mcp-guarder/audit/demo-$(date +%F).jsonl | python3 -m json.tool --json-lines
 ```
 
-> ⚠️ SPEC §8 写的是不带 `--json-lines` 的 `python3 -m json.tool`。**那条命令跑不通** ——
+> ⚠️ 不带 `--json-lines` 的 `python3 -m json.tool` **跑不通** ——
 > 两行 JSONL 不是一个合法 JSON 文档，会报 `Extra data: line 2 column 1 (char 1200)`。
 > 加 `--json-lines`（Python 3.9+ 自带）才对。
 
@@ -401,7 +401,7 @@ tail -2 ~/.mcp-guarder/audit/demo-$(date +%F).jsonl | python3 -m json.tool --jso
 }
 ```
 
-跑过真 `claude -p` 之后，`tool_use_id` 也拿得到（SPEC §7 M1-2，只有真客户端会带 `_meta`）：
+跑过真 `claude -p` 之后，`tool_use_id` 也拿得到（只有真客户端会带 `_meta`）：
 
 ```bash
 python3 -c "
@@ -436,15 +436,15 @@ $GUARDER --config demo/demo.yaml diff demo echo
        "text": {
 ```
 
-> SPEC §8 写的是不带 `--config` 的 `mcp-guarder diff demo echo`。那条命令要求
-> `~/.mcp-guarder/config.yaml` 存在，否则报 `config file not found`。想让 SPEC 的原样命令能跑：
+> 不带 `--config` 的 `mcp-guarder diff demo echo`。那条命令要求
+> `~/.mcp-guarder/config.yaml` 存在，否则报 `config file not found`。想让不带 `--config` 的命令能跑：
 > `cp demo/demo.yaml ~/.mcp-guarder/config.yaml`（实测可行）。
 
 ---
 
 ## 附：demo.yaml 里其它能力的实测
 
-下面这些不在 SPEC §8 的 6 步里，但 `demo.yaml` 都配了，顺手一起验了。
+下面这些不在上面的 rug pull 主线里，但 `demo.yaml` 都配了，顺手一起验了。
 
 ### A. `notifications/tools/list_changed` 变体 —— 同一个会话内完成 rug pull
 
@@ -472,7 +472,7 @@ export RUGPULL_NOTIFY_LIST_CHANGED=1
 
 通知本身**原样转发**（我们不吞它），但它触发的那次重拉当场被抓。这是最狠的一个演示。
 
-### B. 双向脱敏（SPEC §7 M2-3 / M2-4）
+### B. 双向脱敏
 
 出站 —— 参数里塞一个 AKID，探针回显的已经是打码值：
 
@@ -509,7 +509,7 @@ grep -c eyJ  $AUDIT = 0
                                                 {"rule_id": "bearer-jwt", "count": 1}]}
 ```
 
-### C. 权限门四条 deny 路径（SPEC §7 M2-2）
+### C. 权限门四条 deny 路径
 
 ```
 id=10 [没有任何规则命中] isError=True  mcp-guarder denied: no matching rule (rule=-, event=01M07M1GQC1AR16N)
@@ -518,15 +518,15 @@ id=12 [allow: false]     isError=True  mcp-guarder denied: shell 执行一律走
 id=13 [when 条件不满足]  isError=True  mcp-guarder denied: no matching rule (rule=-, event=01M07M1GQC1AR16R)
 ```
 
-`ask` 按 SPEC §7 末尾的降级方案走 —— 一律等价 deny，同时往 `guard.log` 写一行让你手工改配置：
+`ask` 按 v1 的降级方案走 —— 一律等价 deny，同时往 `guard.log` 写一行让你手工改配置：
 
 ```
 2026-08-17T10:24:57.580Z [mcp-guarder] WARN ask is not implemented in v1: rule=write-needs-confirm tool=write_file denied. Change `allow: ask` to true/false in your config.
 ```
 
-全部走 `result.isError: true`，**没有一条用 JSON-RPC `error`**（SPEC §5 硬规矩）。
+全部走 `result.isError: true`，**没有一条用 JSON-RPC `error`**（见根目录 README「Fail-closed 行为」）。
 
-### D. ANSI 隐藏指令（SPEC §7 M3-3）
+### D. ANSI 隐藏指令
 
 ```bash
 export RUGPULL_ANSI=1
@@ -580,7 +580,7 @@ tools/list -> 0 tool(s)
 1. **剥离 `tools/list` 不等于禁掉 `tools/call`。** demo.yaml 里 `allow-echo` 是显式放行的，
    所以就算 `echo` 被剥离了，**手工构造**一条 `tools/call echo` 照样会被 policy 放行、转发到上游。
    模型看不到工具所以不会调，但这是"看得见的门关了，看不见的门还开着"。
-   SPEC §5 那行「工具消失，后续调用走 no-match deny」的前提是 policy 里没有对应的 allow 规则。
+   根目录 README「Fail-closed 行为」里那行「工具消失，后续调用走 no-match deny」的前提是 policy 里没有对应的 allow 规则。
 2. **`diff` 挑的是 mtime 最新的快照**，不一定是"上游此刻在发的那版"。
    如果探针轮换过好几个投毒版本（比如你先跑了 `RUGPULL_ANSI=1` 再跑普通版），
    `diff` 会显示**最早被首见的时间最晚**的那个版本。要干净结果就把
@@ -591,6 +591,6 @@ tools/list -> 0 tool(s)
    upstream→client 泵正阻塞在 `readline()` 上，于是每次正常收尾都会往 `guard.log`
    写一条 `ERROR upstream->client pump crashed` + `KeyboardInterrupt` traceback。
    功能没问题（会话本来就在结束），但日志有噪音。
-4. `demo.yaml` 落盘位置是**真实的 `~/.mcp-guarder/`**（对齐 SPEC §8 的验收命令）。
+4. `demo.yaml` 落盘位置是**真实的 `~/.mcp-guarder/`**。
    想跑在沙箱里，把里面 4 个路径（`inspect.fingerprint.store`、`audit.path`、
    `audit.log_file`、`audit.snapshot_dir`）改掉即可。
