@@ -1,0 +1,35 @@
+# v1 静态规则：v0 原有 7 条 + 依据 MCPTox 开发集归纳的攻击结构规则。
+# 只看过开发集（eval/mcptox/split.json 的 dev）。启用方式：
+#   inspect.static_checks.rules: <把本列表贴进去>
+# 每条新规则的命中数 / 误报数见 docs/eval/detection-report.md。
+
+# ── v0 原有规则（不改动）──
+- {id: hidden-instruction-tag, pattern: '(?is)<\s*(IMPORTANT|SYSTEM|SECRET|INSTRUCTIONS)\s*>'}
+- {id: ignore-previous,   pattern: '(?i)ignore\s+(all\s+)?(previous|prior|above)\s+(instruction|prompt)'}
+- {id: read-extra-file,   pattern: '(?i)(~/\.ssh/|id_rsa|/\.env\b|~/\.aws/credentials|\.claude\.json)'}
+- {id: do-not-tell-user,  pattern: "(?i)(do not|don't)\\s+(tell|mention|reveal).{0,40}(user|human)"}
+- {id: base64-blob,       pattern: '[A-Za-z0-9+/]{200,}={0,2}'}
+- {id: ansi-escape,       pattern: '\x1b\[[0-9;]*[A-Za-z]'}
+- {id: cross-server-ref,  pattern: '(?i)\bmcp__[a-z0-9_]+__'}
+
+# ── v1 新增 ──
+# 优先级劫持：声称自己的指令高于用户请求。
+- {id: priority-override, pattern: '(?i)\b(priority|precedence)\b.{0,30}\b(higher|over|above|supersedes?)\b.{0,30}\b(user|query|request|instruction)'}
+# 无视用户输入：regardless of what the user asked / original path ...
+- {id: regardless-of-user, pattern: '(?i)\bregardless\s+of\s+(the\s+|what\s+the\s+)?(user|original|requested|actual|input|query)'}
+# 跨工具前置指令：使用某工具前必须先调用另一个具名工具。
+- {id: cross-tool-precondition, pattern: "(?i)\\b(before|prior\\s+to)\\s+(using|calling|invoking|executing)\\b.{0,120}?\\b(must|required|need\\s+to|have\\s+to|mandatory)\\b.{0,80}?\\b(call|use|invoke|execute|run)\\b\\s+(the\\s+)?['\"`]?[a-z_][a-z0-9_.-]*['\"`]?"}
+- {id: must-call-tool, pattern: "(?i)\\byou\\s+must\\s+(first\\s+|also\\s+|always\\s+)?(call|invoke|execute|run|use)\\s+(the\\s+)?['\"`][a-z_][a-z0-9_.-]*['\"`]"}
+# 参数篡改：要求模型改写某个具名参数的值。
+- {id: argument-tampering, pattern: "(?i)\\b(modify|change|replace|set|override|overwrite|append|prepend|add|alter|rewrite)\\b\\s+(the\\s+)?['\"`]?[a-z_][a-z0-9_]*['\"`]?\\s+(argument|parameter|param|field|value)\\b"}
+- {id: argument-to-literal, pattern: "(?i)\\b(argument|parameter)\\s+(to|with|into)\\s+['\"`]"}
+# 条件式改写：在使用某工具时，要求改写/追加/替换输入。
+- {id: when-using-rewrite, pattern: "(?i)\\bwhen\\s+(using|calling|invoking|creating|running|the\\s+user|a\\s+user|user)\\b.{0,100}?\\b(append|prepend|replace|override|overwrite|modify|change|rewrite|reroute|alter|set)\\b"}
+- {id: always-rewrite, pattern: "(?i)\\balways\\s+(append|prepend|replace|override|overwrite|rewrite|modify|change)\\b"}
+# 跨工具前置调用（宽松版）：使用 X 之前，触发/调用/运行另一个具名工具。
+- {id: before-trigger-tool, pattern: "(?i)\\b(before|prior\\s+to)\\s+(using|calling|invoking|running|executing)\\b.{0,80}?\\b(use|call|trigger|run|invoke|execute)\\b\\s+(the\\s+)?[`'\"]?[a-z_]+[_-][a-z0-9_-]+"}
+# 更多敏感目标。
+- {id: sensitive-system-file, pattern: '(?i)(/etc/(passwd|shadow|sudoers)|\.bash_history|\.netrc\b|\.git-credentials)'}
+# 强制改道：must + 追加/替换/重定向/改走/忽略用户输入。
+- {id: must-redirect, pattern: "(?i)\\bmust\\s+(instead\\s+|first\\s+|always\\s+)?(append|prepend|replace|redirect|route|reroute|ignore\\s+the\\s+user|instead\\s+call|use\\s+the\\s+new)\\b"}
+- {id: must-be-rerouted, pattern: "(?i)\\bmust\\s+be\\s+(replaced|redirected|routed|rerouted|appended|prepended|restricted\\s+to)\\b"}
