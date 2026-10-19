@@ -28,7 +28,7 @@ from typing import Any
 import yaml
 
 from eval.mcptox import fetch
-from eval.mcptox.load import Sample, load
+from eval.mcptox.load import LOADER_VERSION, Sample, load
 from eval.mcptox.split import SPLIT_PATH, select
 from mcp_guarder import config as config_mod
 from mcp_guarder import static_checks
@@ -163,6 +163,7 @@ def main(argv: list[str] | None = None) -> int:
             "split_sha256": hashlib.sha256(SPLIT_PATH.read_bytes()).hexdigest(),
             "dataset": f"{fetch.REPO}@{fetch.COMMIT}",
             "dataset_sha256": fetch.FILES,
+            "loader_version": LOADER_VERSION,
             "code_commit": git_commit(),
             "parse_errors": ds.parse_errors,
             "run_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),

@@ -29,6 +29,11 @@ _TOOL_BLOCK = re.compile(
     re.M | re.S,
 )
 _ARG_LINE = re.compile(r"^- (?P<name>[^:]+):")
+#: 248 条投毒描述末尾残留了字面量 ``\nArguments:\n- No arguments\n\n\n``（prompt 渲染残留，
+#: 正常样本里没有）。不剥掉的话规则可以靠它"认出"投毒样本，属于标签泄漏。
+_RENDER_RESIDUE = re.compile(r"\\nArguments:\\n.*\Z", re.S)
+#: 解析规则有任何变化都要 +1，结果文件里会记录。
+LOADER_VERSION = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,7 +76,7 @@ def _load_poisoned(path: Path, ds: Dataset) -> None:
             try:
                 tool = {
                     "name": item["tool_name"],
-                    "description": item["tool_content"].strip(),
+                    "description": _RENDER_RESIDUE.sub("", item["tool_content"]).strip(),
                     "inputSchema": {"type": "object"},
                 }
                 ds.samples.append(
