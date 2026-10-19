@@ -127,11 +127,11 @@ def evaluate(samples: list[Sample], cfg: StaticChecksConfig) -> dict[str, Any]:
 def git_commit() -> str:
     try:
         out = subprocess.run(
-            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True, cwd=EVAL_DIR
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True, cwd=EVAL_DIR.parent
         )
         dirty = subprocess.run(
-            ["git", "status", "--porcelain", "--", "src", "eval/rules", "eval/mcptox"],
-            capture_output=True, text=True, check=True, cwd=EVAL_DIR,
+            ["git", "status", "--porcelain", "--", "src", "eval/rules", "eval/mcptox", "eval/run_static.py"],
+            capture_output=True, text=True, check=True, cwd=EVAL_DIR.parent,
         ).stdout.strip()
         return out.stdout.strip() + ("-dirty" if dirty else "")
     except (OSError, subprocess.CalledProcessError):
