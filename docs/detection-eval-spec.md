@@ -2,7 +2,7 @@
 
 - 日期：2026-10-16
 - 分支：`feat/detection-eval`
-- 状态：草案，待确认；尚未实现
+- 状态：A 已完成（2026-10-19），结果见 [评测报告](eval/detection-report.md)；B 待启动
 - 取代：`docs/agent-execution-eval-spec.md`（已删除，评测口径并入 §7）
 
 ## 1. 为什么做

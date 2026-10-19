@@ -25,6 +25,7 @@
 - [审计日志](#审计日志)
 - [CLI](#cli)
 - [威胁模型与局限](#威胁模型与局限)
+- [检测效果评测](#检测效果评测)
 - [非目标](#非目标)
 - [与相关项目的区别](#与相关项目的区别)
 - [开发](#开发)
@@ -191,6 +192,8 @@ policy:
 
 脱敏动作可选 `mask`（默认，替换为 `[REDACTED:{rule_id}]`）、`drop_field`、`deny_call`；`allowlist` 用于放过 `AKIAIOSFODNN7EXAMPLE` 这类示例值。
 
+内置静态规则主要覆盖标签、敏感路径这类显式特征。另有一套针对语义诱导的可选规则 [`eval/rules/v1.yaml`](eval/rules/v1.yaml)，召回率更高，但在真实描述上存在误报风险，建议配合 `on_hit: warn` 使用，详见[检测效果评测](#检测效果评测)。
+
 ## Fail-closed 行为
 
 网关无法确认消息安全时，选择拒绝而不是放行。
@@ -253,7 +256,7 @@ mcp-guarder audit grep <pattern> [--server S]        # 正则搜索审计记录
 
 | 风险 | 应对 | 局限 |
 |---|---|---|
-| Tool poisoning / line jumping | 静态规则扫描 tool 定义，命中即移除 | 新写法、非英文诱导、纯语义社工识别不了；正则可能误判 |
+| Tool poisoning / line jumping | 静态规则扫描 tool 定义，命中即移除 | 内置规则对语义诱导基本无效（MCPTox 测试集召回 1%，见[检测效果评测](#检测效果评测)）；正则可能误判 |
 | Rug pull | TOFU 指纹，受保护字段变化即拒绝 | 首次出现就带毒时 TOFU 无效，只能靠静态规则补 |
 | Cross-server shadowing | 恶意 Server 的描述被静态规则检查；可信 Server 的越权调用由它自己的 policy 拦截 | 每个 Server 都要单独接入才受保护 |
 | Tool result 间接注入 | 对结果做 secret 脱敏 | v1 只脱敏，不识别结果中的注入指令 |
@@ -262,6 +265,21 @@ mcp-guarder audit grep <pattern> [--server S]        # 正则搜索审计记录
 | stdio 代理本身的执行风险 | 启动命令写入日志并在 stderr 展示 | 不提供沙箱，`command` 是否可信由配置文件权限和用户审核保证 |
 
 HTTP/OAuth 相关风险（confused deputy、token passthrough、metadata SSRF）因为 v1 不支持 HTTP 而不覆盖。
+
+## 检测效果评测
+
+用 [MCPTox](https://github.com/zhiqiangwang4/MCPTox-Benchmark)（485 条投毒 + 362 条正常 tool 描述，45 个真实 Server）离线评测静态规则。按 Server 固定切分开发集和测试集，规则只依据开发集编写，测试集每个版本只跑一次：
+
+| 规则 | 测试集召回率 | 测试集误报率 |
+|---|---|---|
+| 内置 7 条（v0） | 2/207 = 1.0% | 0/132 |
+| 可选结构规则（v1） | 149/207 = 72.0% | 0/132 |
+
+- 内置规则对语义投毒基本无效：样本里没有 `<IMPORTANT>` 这类标签，全是"使用 X 之前必须先调用 Y"式诱导。
+- v1 在开发集上召回 95%，测试集上降到 72%，差距来自对措辞和命名风格的过拟合。
+- 误报率 0 只代表 MCPTox 的正常样本；5 条手写的合法描述全部被 v1 命中，真实误报率会更高。
+
+结论：静态规则适合作为低成本的初筛，不能单独作为防线；TOFU 指纹和默认拒绝的 policy 才是主要防线。完整报告见 [docs/eval/detection-report.md](docs/eval/detection-report.md)。
 
 ## 非目标
 
@@ -302,6 +320,7 @@ uv pip install -e '.[dev]'
 | `audit.py` | JSONL 审计与 `guard.log` |
 | `config.py` / `types.py` | 配置解析、严格校验、数据类型 |
 | `cli.py` | 命令行入口与子命令 |
+| `eval/` | 离线评测：MCPTox 下载与解析、固定切分、规则评测 runner |
 
 `tests/harness/replay.py` 用固定的 `initialize` / `tools/list` / `tools/call` 序列做 wire 层回放：直连 Server 和经过网关的响应字节必须一致。
 
@@ -314,7 +333,7 @@ uv pip install -e '.[dev]'
 - [ ] 单行超长消息（10 MB 级）压力测试与超时评估
 - [ ] HTTP/SSE transport（需先解决 OAuth resource identity）
 - [ ] 适配 MCP `2026-07-28` 无状态模型
-- [ ] 静态检测离线评测（MCPTox）与规则迭代，见 [docs/detection-eval-spec.md](docs/detection-eval-spec.md)
+- [x] 静态检测离线评测（MCPTox）与规则迭代，见 [评测报告](docs/eval/detection-report.md)
 - [ ] 会话级污点策略，应对 tool result 间接注入
 
 ## License
