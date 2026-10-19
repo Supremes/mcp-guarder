@@ -1,0 +1,88 @@
+version: 1
+server:
+  name: filesystem            # 用于区分指纹和审计记录，后续启动时应保持不变
+  transport: stdio            # v1 只支持 stdio
+
+defaults:                     # 发生异常时采用 fail-closed 策略
+  on_no_match: deny           # 没有 policy 规则命中时，拒绝 tools/call
+  on_rule_conflict: deny      # policy 规则发生冲突时拒绝处理
+  on_detector_error: deny     # 检测模块执行失败时，拒绝当前消息
+  on_audit_write_failure: deny # 审计记录无法写入时，拒绝后续调用
+  on_unknown_method: passthrough   # 未专门处理的方法保持原样转发
+  on_upstream_crash: fail          # Server 子进程异常退出时，结束整个代理会话
+
+# ── 1. 检查 tool 定义 ──
+inspect:
+  fingerprint:
+    enabled: true
+    store: ~/.mcp-guarder/fingerprints.sqlite
+    fields: [name, title, description, inputSchema]   # 参与 blake2b 指纹计算的字段
+    on_first_seen: allow_and_record   # 第一次出现时放行，并建立 TOFU 基线
+    on_change: deny_and_alert         # 指纹变化时拒绝该 tool，并记录告警
+  static_checks:
+    enabled: true
+    on_hit: deny                      # 命中规则后可选择 deny 或 warn
+    scan_fields: [name, title, description, inputSchema, annotations]
+    rules:
+      - {id: hidden-instruction-tag, pattern: '(?is)<\s*(IMPORTANT|SYSTEM|SECRET|INSTRUCTIONS)\s*>'}
+      - {id: ignore-previous,   pattern: '(?i)ignore\s+(all\s+)?(previous|prior|above)\s+(instruction|prompt)'}
+      - {id: read-extra-file,   pattern: '(?i)(~/\.ssh/|id_rsa|/\.env\b|~/\.aws/credentials|\.claude\.json)'}
+      - {id: do-not-tell-user,  pattern: "(?i)(do not|don't)\\s+(tell|mention|reveal).{0,40}(user|human)"}
+      - {id: base64-blob,       pattern: '[A-Za-z0-9+/]{200,}={0,2}'}
+      - {id: ansi-escape,       pattern: '\x1b\[[0-9;]*[A-Za-z]'}
+      - {id: cross-server-ref,  pattern: '(?i)\bmcp__[a-z0-9_]+__'}   # 描述引用其他 Server 时，提示 shadowing 风险
+
+# ── 2. 控制 tool 调用权限 ──
+policy:
+  rules:                      # 按顺序求值，第一条完整匹配的规则决定结果
+    # v1 只支持下面 6 个 when 操作符，出现其他值时拒绝启动：
+    #   starts_with / equals / matches / not_matches / one_of / exists
+    # ${PROJECT_DIR} 优先读取 CLAUDE_PROJECT_DIR，未设置时使用 mcp-guarder 的 cwd
+    - id: allow-read-in-project
+      tool: read_file         # tool 使用 glob 匹配，支持 * 和 ?，不是正则表达式
+      allow: true
+      when:                   # 所有条件都要满足；否则继续检查后面的规则
+        - {arg: path, starts_with: "${PROJECT_DIR}/"}
+        - {arg: path, not_matches: '(?i)(\.env|/\.git/|id_rsa|credentials|\.claude\.json)'}
+    - id: write-needs-confirm
+      tool: write_file
+      allow: ask              # v1 暂不支持交互确认，因此按 deny 处理
+      when:
+        - {arg: path, starts_with: "${PROJECT_DIR}/"}
+    - id: block-shell
+      tool: "exec_*"
+      allow: false
+      reason: "shell 执行一律走人工"
+  deny_response:
+    kind: tool_result_error   # 使用 result.isError=true 返回拒绝原因，不返回 JSON-RPC error
+    text: "mcp-guarder denied: {reason} (rule={rule_id}, event={audit_id})"
+
+# ── 3. 对调用参数和返回结果脱敏 ──
+redact:
+  enabled: true
+  outbound_scan: [params.arguments]            # 递归扫描调用参数中的所有字符串
+  inbound_scan:
+    - result.content[].text
+    - result.content[].resource.text           # 扫描内嵌资源的文本
+    - result.structuredContent                 # 递归扫描任意 JSON 结构
+  action: mask                                 # mask | drop_field | deny_call
+  mask_template: "[REDACTED:{rule_id}]"
+  rules:
+    - {id: aws-akid,          pattern: '\bAKIA[0-9A-Z]{16}\b'}
+    - {id: bearer-jwt,        pattern: '\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}'}
+    - {id: openai-key,        pattern: '\bsk-[A-Za-z0-9]{20,}\b'}
+    - {id: github-pat,        pattern: '\bgh[pousr]_[A-Za-z0-9]{36}\b'}
+    - {id: private-key-block, pattern: '-----BEGIN [A-Z ]*PRIVATE KEY-----'}
+  allowlist: ['\bAKIAIOSFODNN7EXAMPLE\b']
+  # TODO(待验证)：评估是否可以直接使用 detect-secrets 的插件 API，
+  # 或读取 gitleaks 的 TOML 规则，减少手动维护正则表达式的成本。
+
+# ── 4. 保存审计记录和运行日志 ──
+audit:
+  path: ~/.mcp-guarder/audit/{server}-{date}.jsonl
+  fsync: every_record         # 每条记录立即同步到磁盘；也可选 interval 或 never
+  record: {tools_list: full, tools_call: full, other_methods: metadata_only}
+  payload:
+    max_bytes: 4096           # 预览超过此大小时截断，同时保存完整内容的 sha256
+    store_redacted_only: true # 审计文件只保存脱敏后的内容
+  log_file: ~/.mcp-guarder/guard.log    # 供用户阅读的日志；stdout 只用于协议消息

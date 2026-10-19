@@ -67,7 +67,7 @@ policy:
         - {arg: path, starts_with: "${PROJECT_DIR}/"}
 ```
 
-完整示例见 [`demo/demo.yaml`](demo/demo.yaml)。
+带注释的完整参考配置见 [`examples/config.example.yaml`](examples/config.example.yaml)，demo 用的配置见 [`demo/demo.yaml`](demo/demo.yaml)。
 
 **挂到 MCP Server 前面**：
 

@@ -74,15 +74,12 @@ def problems_text(exc: ConfigError) -> str:
 
 
 def spec_example_yaml() -> str:
-    """从 SPEC §4 里原样抠出那份 YAML —— 它必须永远能解析。"""
-    text = (REPO_ROOT / "SPEC.md").read_text(encoding="utf-8")
-    start = text.index("```yaml\nversion: 1")
-    end = text.index("```", start + len("```yaml\n"))
-    return text[start + len("```yaml\n") : end]
+    """完整参考配置 examples/config.example.yaml（原 SPEC §4）—— 它必须永远能解析。"""
+    return (REPO_ROOT / "examples" / "config.example.yaml").read_text(encoding="utf-8")
 
 
 def test_spec_section4_example_parses(write_config, monkeypatch, tmp_path):
-    """SPEC §4 那份 YAML 是唯一真相，逐条对齐。"""
+    """参考配置是唯一真相，逐条对齐。"""
     monkeypatch.setenv("HOME", str(tmp_path))
     cfg = load_config(write_config(spec_example_yaml()))
 
