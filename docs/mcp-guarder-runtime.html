@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="generator" content="archify 2.16.0-dev.0">
-  <title>mcp-guarder 高层运行时架构</title>
+  <meta name="generator" content="archify 2.16.0">
+  <title>mcp-guarder 代码阅读架构</title>
   <script>
     // Resolve the theme before first paint so light-preference users don't
     // see a dark flash. The toolbar script below re-applies with UI state.
@@ -589,8 +589,10 @@
       padding-bottom: calc(0.75rem + var(--archify-nav-reserve));
     }
     html[data-present="true"]:not([data-embed="true"]) .diagram-container > svg {
-      width: 100%;
+      flex: 1 1 auto;
       height: 100%;
+      min-height: 0;
+      width: 100%;
       min-width: 0;
     }
     html[data-present="true"]:not([data-embed="true"]) .cards { display: none; }
@@ -2885,6 +2887,11 @@
       body { padding-block: 1.25rem; }
       .header { margin-bottom: 0.875rem; }
       .cards { margin-top: 0.75rem; }
+      html[data-nav-stage-rail="true"] body { padding-block: 0.375rem; }
+      html[data-nav-stage-rail="true"] .header { margin-bottom: 0.5rem; }
+      html[data-nav-stage-rail="true"] .guided-views { margin-bottom: 0.375rem; }
+      html[data-nav-stage-rail="true"] .diagram-container[data-nav-stage-rail="true"] { padding-top: 0.5rem; }
+      html[data-nav-stage-rail="true"] .cards { margin-top: 0.375rem; }
     }
 
     html[data-preset="blueprint"] .card {
@@ -4948,7 +4955,7 @@
            data-preset-badge-blueprint="蓝图 / 修订 01"
            data-preset-badge-editorial="编辑风格 / 现场笔记">
         <div class="pulse-dot"></div>
-        <h1>mcp-guarder 高层运行时架构</h1>
+        <h1>mcp-guarder 代码阅读架构</h1>
       </div>
     </div>
 
@@ -4997,8 +5004,8 @@
     <!-- Main Diagram -->
     <div class="diagram-container" data-detail-level="read"
          data-preset-badge-editorial-plate="ARCHIFY / 图版 04">
-      <svg viewBox="0 0 1320 760" role="img" lang="zh-CN" aria-labelledby="archify-diagram-title archify-diagram-description" data-preset="classic" data-quality-profile="showcase">
-        <title id="archify-diagram-title">mcp-guarder 高层运行时架构</title>
+      <svg viewBox="0 0 1300 600" role="img" lang="zh-CN" aria-labelledby="archify-diagram-title archify-diagram-description" data-preset="classic" data-quality-profile="showcase">
+        <title id="archify-diagram-title">mcp-guarder 代码阅读架构</title>
         <desc id="archify-diagram-description">由 Archify 生成的架构图。</desc>
         <!-- Definitions -->
         <defs>
@@ -5023,240 +5030,184 @@
         <rect width="100%" height="100%" fill="url(#grid)" />
 
         <!-- Boundaries (behind everything) -->
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="security-group" data-composition-frame-id="0" data-composition-frame-label="受信任的 mcp-guarder 进程边界" x="201" y="291" width="903" height="310" rx="8" class="c-security-group" stroke-width="1"/>
 
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="security-group" data-composition-frame-id="1" data-composition-frame-label="本地可信配置与证据边界" x="205" y="81" width="1095" height="520" rx="8" class="c-security-group" stroke-width="1"/>
-
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="2" data-composition-frame-label="外部不可信执行域" x="1088" y="291" width="214" height="116" rx="12" class="c-region" stroke-width="1"/>
 
         <!-- Connection paths (before components for correct z-order) -->
-        <path data-edge-from="agent" data-edge-to="cli" data-edge-label="JSON-RPC / stdio" data-edge-key="0" data-edge-id="agentToCli" data-composition-points="180,351;225,351" d="M 180 351 L 225 351" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="cli" data-edge-to="router" data-edge-label="启动并监管" data-edge-key="1" data-edge-id="cliToRouter" data-composition-points="385,351;430,351" d="M 385 351 L 430 351" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="router" data-edge-to="outboundRedactor" data-edge-label="tools/call" data-edge-key="2" data-edge-id="routerToOutbound" data-composition-points="595,344;640,344" d="M 595 344 L 640 344" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="outboundRedactor" data-edge-to="policyGate" data-edge-label="脱敏参数" data-edge-key="3" data-edge-id="outboundToPolicy" data-composition-points="800,351;845,351" d="M 800 351 L 845 351" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="policyGate" data-edge-to="upstream" data-edge-label="允许后转发" data-edge-key="4" data-edge-id="policyToUpstream" data-composition-points="1005,344;1110,344" d="M 1005 344 L 1110 344" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="upstream" data-edge-to="toolInspector" data-edge-label="tools/list 响应" data-edge-key="5" data-edge-id="upstreamToInspector" data-composition-points="1110,358;1095,358;1095,536;1080,536" d="M 1110 358 L 1102.5 358 Q 1095 358 1095 365.5 L 1095 528.5 Q 1095 536 1087.5 536 L 1080 536" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="toolInspector" data-edge-to="inboundRedactor" data-edge-label="过滤后的响应" data-edge-key="6" data-edge-id="inspectorToInbound" data-composition-points="900,543;820,543" d="M 900 543 L 820 543" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="inboundRedactor" data-edge-to="router" data-edge-label="脱敏结果" data-edge-key="7" data-edge-id="inboundToRouter" data-composition-points="640,543;617.5,543;617.5,358;595,358" d="M 640 543 L 625.5 543 Q 617.5 543 617.5 535 L 617.5 366 Q 617.5 358 609.5 358 L 595 358" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="config" data-edge-to="cli" data-edge-label="启动时严格校验" data-edge-key="8" data-edge-id="configToCli" data-composition-points="305,175;305,315" d="M 305 175 L 305 315" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
-        <path data-edge-from="toolInspector" data-edge-to="fingerprints" data-edge-label="TOFU / 变更比对" data-edge-key="9" data-edge-id="inspectorToFingerprints" data-composition-points="1080,550;1110,550" d="M 1080 550 L 1110 550" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
-        <path data-edge-from="router" data-edge-to="audit" data-edge-label="脱敏后记账" data-edge-key="10" data-edge-id="routerToAudit" data-composition-points="512.5,387;512.5,505" d="M 512.5 387 L 512.5 505" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="mcp-client" data-edge-to="stdio-proxy" data-edge-label="JSON-RPC 双向 stdio" data-edge-key="0" data-edge-id="client-stdio-link" data-composition-points="285,331;500,331" d="M 285 331 L 500 331" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="stdio-proxy" data-edge-to="server-process" data-edge-label="JSON-RPC 双向管道" data-edge-key="1" data-edge-id="server-stdio-link" data-composition-points="770,331;925,331" d="M 770 331 L 925 331" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="startup-config" data-edge-to="stdio-proxy" data-edge-label="校验配置并启动" data-edge-key="2" data-edge-id="startup-initializes-proxy" data-composition-points="635,120;635,286" d="M 635 120 L 635 286" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="stdio-proxy" data-edge-to="discovery-checks" data-edge-label="tools/list 响应" data-edge-key="3" data-edge-id="proxy-dispatches-discovery" data-composition-points="635,286;635,262;901,262;901,190;925,190" d="M 635 286 L 635 270 Q 635 262 643 262 L 893 262 Q 901 262 901 254 L 901 198 Q 901 190 909 190 L 925 190" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="discovery-checks" data-edge-to="fingerprint-state" data-edge-label="比对与留证" data-edge-key="4" data-edge-id="discovery-persists-fingerprints" data-composition-points="1087.5,145;1087.5,98" d="M 1087.5 145 L 1087.5 98" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="stdio-proxy" data-edge-to="call-checks" data-edge-label="tools/call 请求及响应" data-edge-key="5" data-edge-id="proxy-dispatches-call" data-composition-points="635,376;635,400;901,400;901,475;925,475" d="M 635 376 L 635 392 Q 635 400 643 400 L 893 400 Q 901 400 901 408 L 901 467 Q 901 475 909 475 L 925 475" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
+        <path data-edge-from="stdio-proxy" data-edge-to="audit-module" data-edge-label="记录决策与耗时" data-edge-key="6" data-edge-id="proxy-records-decisions" data-composition-points="635,376;635,430" d="M 635 376 L 635 430" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="audit-module" data-edge-to="local-logs" data-edge-label="追加写入" data-edge-key="7" data-edge-id="audit-writes-files" data-composition-points="500,475;285,475" d="M 500 475 L 285 475" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
 
         <!-- Components -->
-        <g id="node-agent" data-node-id="agent" data-node-label="AI Agent / MCP 客户端" tabindex="0" role="button" aria-label="聚焦AI Agent / MCP 客户端，Claude Code 等, 架构组件" aria-pressed="false" data-node-kind="external" data-node-sublabel="Claude Code 等" data-node-context="架构组件">
-          <title>AI Agent / MCP 客户端 · Claude Code 等 · 架构组件</title>
-          <rect x="30" y="315" width="150" height="72" rx="6" class="c-mask"/>
-          <rect x="30" y="315" width="150" height="72" rx="6" class="c-external" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(36 321) scale(0.6875)">
+        <g id="node-mcp-client" data-node-id="mcp-client" data-node-label="MCP 客户端" tabindex="0" role="button" aria-label="聚焦MCP 客户端，发请求、接收工具结果, 架构组件" aria-pressed="false" data-node-kind="external" data-node-sublabel="发请求、接收工具结果" data-node-context="架构组件">
+          <title>MCP 客户端 · 发请求、接收工具结果 · 架构组件</title>
+          <rect x="60" y="286" width="225" height="90" rx="6" class="c-mask"/>
+          <rect x="60" y="286" width="225" height="90" rx="6" class="c-external" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(66 292) scale(0.6875)">
             <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
             <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="105" y="349" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">AI Agent / MCP 客户端</text>
-        <text data-detail="context" x="105" y="365" class="t-muted" font-size="9" text-anchor="middle">Claude Code 等</text>
+          <text data-node-label="" data-detail-anchor="" x="172.5" y="329" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">MCP 客户端</text>
+        <text data-detail="context" x="172.5" y="345" class="t-muted" font-size="9" text-anchor="middle">发请求、接收工具结果</text>
         </g>
 
-        <g id="node-cli" data-node-id="cli" data-node-label="CLI 与进程监管" tabindex="0" role="button" aria-label="聚焦CLI 与进程监管，mcp-guarder -- &lt;command&gt;, 受信任的 mcp-guarder 进程边界" aria-pressed="false" data-node-kind="backend" data-node-sublabel="mcp-guarder -- &lt;command&gt;" data-node-context="受信任的 mcp-guarder 进程边界">
-          <title>CLI 与进程监管 · mcp-guarder -- &lt;command&gt; · 受信任的 mcp-guarder 进程边界</title>
-          <rect x="225" y="315" width="160" height="72" rx="6" class="c-mask"/>
-          <rect x="225" y="315" width="160" height="72" rx="6" class="c-backend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(231 321) scale(0.6875)">
+        <g id="node-startup-config" data-node-id="startup-config" data-node-label="命令入口与配置" tabindex="0" role="button" aria-label="聚焦命令入口与配置，cli.py + config.py, 架构组件" aria-pressed="false" data-node-kind="backend" data-node-sublabel="cli.py + config.py" data-node-context="架构组件">
+          <title>命令入口与配置 · cli.py + config.py · 架构组件</title>
+          <rect x="500" y="30" width="270" height="90" rx="6" class="c-mask"/>
+          <rect x="500" y="30" width="270" height="90" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(506 36) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="305" y="349" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">CLI 与进程监管</text>
-        <text data-detail="context" x="305" y="365" class="t-muted" font-size="9" text-anchor="middle">mcp-guarder -- &lt;command&gt;</text>
+          <text data-node-label="" data-detail-anchor="" x="635" y="73" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">命令入口与配置</text>
+        <text data-detail="context" x="635" y="89" class="t-muted" font-size="9" text-anchor="middle">cli.py + config.py</text>
         </g>
 
-        <g id="node-router" data-node-id="router" data-node-label="stdio 双向代理" tabindex="0" role="button" aria-label="聚焦stdio 双向代理，JSON-RPC 按行路由, 受信任的 mcp-guarder 进程边界" aria-pressed="false" data-node-kind="backend" data-node-sublabel="JSON-RPC 按行路由" data-node-tag="stdout 协议专用" data-node-context="受信任的 mcp-guarder 进程边界">
-          <title>stdio 双向代理 · JSON-RPC 按行路由 · 受信任的 mcp-guarder 进程边界 · stdout 协议专用</title>
-          <rect x="430" y="315" width="165" height="72" rx="6" class="c-mask"/>
-          <rect x="430" y="315" width="165" height="72" rx="6" class="c-backend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(436 321) scale(0.6875)">
+        <g id="node-stdio-proxy" data-node-id="stdio-proxy" data-node-label="Proxy 双向转发主干" tabindex="0" role="button" aria-label="聚焦Proxy 双向转发主干，proxy.py / IdLedger / Routed, 架构组件" aria-pressed="false" data-node-kind="backend" data-node-sublabel="proxy.py / IdLedger / Routed" data-node-tag="按行读写，按 id 识别响应" data-node-context="架构组件">
+          <title>Proxy 双向转发主干 · proxy.py / IdLedger / Routed · 架构组件 · 按行读写，按 id 识别响应</title>
+          <rect x="500" y="286" width="270" height="90" rx="6" class="c-mask"/>
+          <rect x="500" y="286" width="270" height="90" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(506 292) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="512.5" y="349" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">stdio 双向代理</text>
-        <text data-detail="context" x="512.5" y="365" class="t-muted" font-size="9" text-anchor="middle">JSON-RPC 按行路由</text>
-        <text data-detail="fine" x="512.5" y="379" class="t-backend" font-size="7" text-anchor="middle">stdout 协议专用</text>
+          <text data-node-label="" data-detail-anchor="" x="635" y="329" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Proxy 双向转发主干</text>
+        <text data-detail="context" x="635" y="345" class="t-muted" font-size="9" text-anchor="middle">proxy.py / IdLedger / Routed</text>
+        <text data-detail="fine" x="635" y="368" class="t-backend" font-size="7" text-anchor="middle">按行读写，按 id 识别响应</text>
         </g>
 
-        <g id="node-outboundRedactor" data-node-id="outboundRedactor" data-node-label="出站 Secret 脱敏" tabindex="0" role="button" aria-label="聚焦出站 Secret 脱敏，params.arguments, 受信任的 mcp-guarder 进程边界" aria-pressed="false" data-node-kind="security" data-node-sublabel="params.arguments" data-node-context="受信任的 mcp-guarder 进程边界">
-          <title>出站 Secret 脱敏 · params.arguments · 受信任的 mcp-guarder 进程边界</title>
-          <rect x="640" y="315" width="160" height="72" rx="6" class="c-mask"/>
-          <rect x="640" y="315" width="160" height="72" rx="6" class="c-security" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(646 321) scale(0.6875)">
-            <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
-            <path d="m5.8 8 1.5 1.5 3-3"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="720" y="349" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">出站 Secret 脱敏</text>
-        <text data-detail="context" x="720" y="365" class="t-muted" font-size="9" text-anchor="middle">params.arguments</text>
-        </g>
-
-        <g id="node-policyGate" data-node-id="policyGate" data-node-label="默认拒绝权限门" tabindex="0" role="button" aria-label="聚焦默认拒绝权限门，首条匹配规则定案, 受信任的 mcp-guarder 进程边界" aria-pressed="false" data-node-kind="security" data-node-sublabel="首条匹配规则定案" data-node-tag="fail-closed" data-node-context="受信任的 mcp-guarder 进程边界">
-          <title>默认拒绝权限门 · 首条匹配规则定案 · 受信任的 mcp-guarder 进程边界 · fail-closed</title>
-          <rect x="845" y="315" width="160" height="72" rx="6" class="c-mask"/>
-          <rect x="845" y="315" width="160" height="72" rx="6" class="c-security" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(851 321) scale(0.6875)">
-            <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
-            <path d="m5.8 8 1.5 1.5 3-3"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="925" y="349" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">默认拒绝权限门</text>
-        <text data-detail="context" x="925" y="365" class="t-muted" font-size="9" text-anchor="middle">首条匹配规则定案</text>
-        <text data-detail="fine" x="925" y="379" class="t-security" font-size="7" text-anchor="middle">fail-closed</text>
-        </g>
-
-        <g id="node-upstream" data-node-id="upstream" data-node-label="上游 MCP Server" tabindex="0" role="button" aria-label="聚焦上游 MCP Server，不可信子进程, 外部不可信执行域" aria-pressed="false" data-node-kind="external" data-node-sublabel="不可信子进程" data-node-context="外部不可信执行域">
-          <title>上游 MCP Server · 不可信子进程 · 外部不可信执行域</title>
-          <rect x="1110" y="315" width="170" height="72" rx="6" class="c-mask"/>
-          <rect x="1110" y="315" width="170" height="72" rx="6" class="c-external" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(1116 321) scale(0.6875)">
+        <g id="node-server-process" data-node-id="server-process" data-node-label="上游 MCP Server" tabindex="0" role="button" aria-label="聚焦上游 MCP Server，真正执行工具的子进程, 架构组件" aria-pressed="false" data-node-kind="external" data-node-sublabel="真正执行工具的子进程" data-node-tag="每次会话启动一次" data-node-context="架构组件">
+          <title>上游 MCP Server · 真正执行工具的子进程 · 架构组件 · 每次会话启动一次</title>
+          <rect x="925" y="286" width="325" height="90" rx="6" class="c-mask"/>
+          <rect x="925" y="286" width="325" height="90" rx="6" class="c-external" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(931 292) scale(0.6875)">
             <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
             <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="1195" y="349" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">上游 MCP Server</text>
-        <text data-detail="context" x="1195" y="365" class="t-muted" font-size="9" text-anchor="middle">不可信子进程</text>
+          <text data-node-label="" data-detail-anchor="" x="1087.5" y="329" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">上游 MCP Server</text>
+        <text data-detail="context" x="1087.5" y="345" class="t-muted" font-size="9" text-anchor="middle">真正执行工具的子进程</text>
+        <text data-detail="fine" x="1087.5" y="368" class="t-external" font-size="7" text-anchor="middle">每次会话启动一次</text>
         </g>
 
-        <g id="node-toolInspector" data-node-id="toolInspector" data-node-label="Tool 描述检查" tabindex="0" role="button" aria-label="聚焦Tool 描述检查，静态投毒 + 指纹变更, 受信任的 mcp-guarder 进程边界" aria-pressed="false" data-node-kind="security" data-node-sublabel="静态投毒 + 指纹变更" data-node-tag="tools/list" data-node-context="受信任的 mcp-guarder 进程边界">
-          <title>Tool 描述检查 · 静态投毒 + 指纹变更 · 受信任的 mcp-guarder 进程边界 · tools/list</title>
-          <rect x="900" y="505" width="180" height="76" rx="6" class="c-mask"/>
-          <rect x="900" y="505" width="180" height="76" rx="6" class="c-security" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(906 511) scale(0.6875)">
+        <g id="node-discovery-checks" data-node-id="discovery-checks" data-node-label="工具发现检查" tabindex="0" role="button" aria-label="聚焦工具发现检查，fingerprint.py + static_checks.py, 架构组件" aria-pressed="false" data-node-kind="security" data-node-sublabel="fingerprint.py + static_checks.py" data-node-tag="剥离被判定有风险的工具" data-node-context="架构组件">
+          <title>工具发现检查 · fingerprint.py + static_checks.py · 架构组件 · 剥离被判定有风险的工具</title>
+          <rect x="925" y="145" width="325" height="90" rx="6" class="c-mask"/>
+          <rect x="925" y="145" width="325" height="90" rx="6" class="c-security" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(931 151) scale(0.6875)">
             <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
             <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="990" y="541" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Tool 描述检查</text>
-        <text data-detail="context" x="990" y="557" class="t-muted" font-size="9" text-anchor="middle">静态投毒 + 指纹变更</text>
-        <text data-detail="fine" x="990" y="573" class="t-security" font-size="7" text-anchor="middle">tools/list</text>
+          <text data-node-label="" data-detail-anchor="" x="1087.5" y="188" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">工具发现检查</text>
+        <text data-detail="context" x="1087.5" y="204" class="t-muted" font-size="9" text-anchor="middle">fingerprint.py + static_checks.py</text>
+        <text data-detail="fine" x="1087.5" y="227" class="t-security" font-size="7" text-anchor="middle">剥离被判定有风险的工具</text>
         </g>
 
-        <g id="node-inboundRedactor" data-node-id="inboundRedactor" data-node-label="回流 Secret 脱敏" tabindex="0" role="button" aria-label="聚焦回流 Secret 脱敏，result / structuredContent, 受信任的 mcp-guarder 进程边界" aria-pressed="false" data-node-kind="security" data-node-sublabel="result / structuredContent" data-node-context="受信任的 mcp-guarder 进程边界">
-          <title>回流 Secret 脱敏 · result / structuredContent · 受信任的 mcp-guarder 进程边界</title>
-          <rect x="640" y="505" width="180" height="76" rx="6" class="c-mask"/>
-          <rect x="640" y="505" width="180" height="76" rx="6" class="c-security" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(646 511) scale(0.6875)">
+        <g id="node-call-checks" data-node-id="call-checks" data-node-label="工具调用检查" tabindex="0" role="button" aria-label="聚焦工具调用检查，redact.py + policy.py, 架构组件" aria-pressed="false" data-node-kind="security" data-node-sublabel="redact.py + policy.py" data-node-tag="请求先脱敏再判权限；响应脱敏" data-node-context="架构组件">
+          <title>工具调用检查 · redact.py + policy.py · 架构组件 · 请求先脱敏再判权限；响应脱敏</title>
+          <rect x="925" y="430" width="325" height="90" rx="6" class="c-mask"/>
+          <rect x="925" y="430" width="325" height="90" rx="6" class="c-security" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(931 436) scale(0.6875)">
             <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
             <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="730" y="541" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">回流 Secret 脱敏</text>
-        <text data-detail="context" x="730" y="557" class="t-muted" font-size="9" text-anchor="middle">result / structuredContent</text>
+          <text data-node-label="" data-detail-anchor="" x="1087.5" y="473" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">工具调用检查</text>
+        <text data-detail="context" x="1087.5" y="489" class="t-muted" font-size="9" text-anchor="middle">redact.py + policy.py</text>
+        <text data-detail="fine" x="1087.5" y="512" class="t-security" font-size="7" text-anchor="middle">请求先脱敏再判权限；响应脱敏</text>
         </g>
 
-        <g id="node-config" data-node-id="config" data-node-label="YAML 配置" tabindex="0" role="button" aria-label="聚焦YAML 配置，策略 / 检测 / 审计, 本地可信配置与证据边界" aria-pressed="false" data-node-kind="external" data-node-sublabel="策略 / 检测 / 审计" data-node-context="本地可信配置与证据边界">
-          <title>YAML 配置 · 策略 / 检测 / 审计 · 本地可信配置与证据边界</title>
-          <rect x="225" y="105" width="160" height="70" rx="6" class="c-mask"/>
-          <rect x="225" y="105" width="160" height="70" rx="6" class="c-external" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(231 111) scale(0.6875)">
-            <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
-            <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
-          </g>
-          <text data-node-label="" data-detail-anchor="" x="305" y="138" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">YAML 配置</text>
-        <text data-detail="context" x="305" y="154" class="t-muted" font-size="9" text-anchor="middle">策略 / 检测 / 审计</text>
-        </g>
-
-        <g id="node-fingerprints" data-node-id="fingerprints" data-node-label="指纹库" tabindex="0" role="button" aria-label="聚焦指纹库，SQLite + Tool 快照, 本地可信配置与证据边界" aria-pressed="false" data-node-kind="database" data-node-sublabel="SQLite + Tool 快照" data-node-context="本地可信配置与证据边界">
-          <title>指纹库 · SQLite + Tool 快照 · 本地可信配置与证据边界</title>
-          <rect x="1110" y="505" width="170" height="76" rx="6" class="c-mask"/>
-          <rect x="1110" y="505" width="170" height="76" rx="6" class="c-database" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(1116 511) scale(0.6875)">
+        <g id="node-fingerprint-state" data-node-id="fingerprint-state" data-node-label="指纹与工具快照" tabindex="0" role="button" aria-label="聚焦指纹与工具快照，SQLite + JSON 快照, 架构组件" aria-pressed="false" data-node-kind="database" data-node-sublabel="SQLite + JSON 快照" data-node-context="架构组件">
+          <title>指纹与工具快照 · SQLite + JSON 快照 · 架构组件</title>
+          <rect x="925" y="20" width="325" height="78" rx="6" class="c-mask"/>
+          <rect x="925" y="20" width="325" height="78" rx="6" class="c-database" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(931 26) scale(0.6875)">
             <ellipse cx="8" cy="4" rx="5" ry="2"/>
             <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="1195" y="541" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">指纹库</text>
-        <text data-detail="context" x="1195" y="557" class="t-muted" font-size="9" text-anchor="middle">SQLite + Tool 快照</text>
+          <text data-node-label="" data-detail-anchor="" x="1087.5" y="57" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">指纹与工具快照</text>
+        <text data-detail="context" x="1087.5" y="73" class="t-muted" font-size="9" text-anchor="middle">SQLite + JSON 快照</text>
         </g>
 
-        <g id="node-audit" data-node-id="audit" data-node-label="审计与 Guard 日志" tabindex="0" role="button" aria-label="聚焦审计与 Guard 日志，JSONL + 本地文件, 本地可信配置与证据边界" aria-pressed="false" data-node-kind="database" data-node-sublabel="JSONL + 本地文件" data-node-tag="脱敏后写入" data-node-context="本地可信配置与证据边界">
-          <title>审计与 Guard 日志 · JSONL + 本地文件 · 本地可信配置与证据边界 · 脱敏后写入</title>
-          <rect x="430" y="505" width="165" height="76" rx="6" class="c-mask"/>
-          <rect x="430" y="505" width="165" height="76" rx="6" class="c-database" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(436 511) scale(0.6875)">
+        <g id="node-audit-module" data-node-id="audit-module" data-node-label="审计与诊断" tabindex="0" role="button" aria-label="聚焦审计与诊断，audit.py, 架构组件" aria-pressed="false" data-node-kind="backend" data-node-sublabel="audit.py" data-node-tag="审计故障阻断 tools/call" data-node-context="架构组件">
+          <title>审计与诊断 · audit.py · 架构组件 · 审计故障阻断 tools/call</title>
+          <rect x="500" y="430" width="270" height="90" rx="6" class="c-mask"/>
+          <rect x="500" y="430" width="270" height="90" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(506 436) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="635" y="473" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">审计与诊断</text>
+        <text data-detail="context" x="635" y="489" class="t-muted" font-size="9" text-anchor="middle">audit.py</text>
+        <text data-detail="fine" x="635" y="512" class="t-backend" font-size="7" text-anchor="middle">审计故障阻断 tools/call</text>
+        </g>
+
+        <g id="node-local-logs" data-node-id="local-logs" data-node-label="本地日志文件" tabindex="0" role="button" aria-label="聚焦本地日志文件，JSONL + guard.log, 架构组件" aria-pressed="false" data-node-kind="database" data-node-sublabel="JSONL + guard.log" data-node-context="架构组件">
+          <title>本地日志文件 · JSONL + guard.log · 架构组件</title>
+          <rect x="60" y="430" width="225" height="90" rx="6" class="c-mask"/>
+          <rect x="60" y="430" width="225" height="90" rx="6" class="c-database" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(66 436) scale(0.6875)">
             <ellipse cx="8" cy="4" rx="5" ry="2"/>
             <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="512.5" y="541" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">审计与 Guard 日志</text>
-        <text data-detail="context" x="512.5" y="557" class="t-muted" font-size="9" text-anchor="middle">JSONL + 本地文件</text>
-        <text data-detail="fine" x="512.5" y="573" class="t-database" font-size="7" text-anchor="middle">脱敏后写入</text>
+          <text data-node-label="" data-detail-anchor="" x="172.5" y="473" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">本地日志文件</text>
+        <text data-detail="context" x="172.5" y="489" class="t-muted" font-size="9" text-anchor="middle">JSONL + guard.log</text>
         </g>
 
         <!-- Connection labels -->
-        <g data-detail="context" data-edge-from="agent" data-edge-to="cli" data-edge-label="JSON-RPC / stdio" data-edge-key="0" data-edge-id="agentToCli">
-          <rect x="159.1" y="398" width="86.8" height="14" rx="3" class="c-mask"/>
-          <text x="202.5" y="408" class="t-backend" font-size="8" text-anchor="middle">JSON-RPC / stdio</text>
+        <g data-detail="context" data-edge-from="mcp-client" data-edge-to="stdio-proxy" data-edge-label="JSON-RPC 双向 stdio" data-edge-key="0" data-edge-id="client-stdio-link">
+          <rect x="341.9" y="311" width="101.2" height="14" rx="3" class="c-mask"/>
+          <text x="392.5" y="321" class="t-backend" font-size="8" text-anchor="middle">JSON-RPC 双向 stdio</text>
         </g>
-        <g data-detail="context" data-edge-from="cli" data-edge-to="router" data-edge-label="启动并监管" data-edge-key="1" data-edge-id="cliToRouter">
-          <rect x="378.5" y="301" width="58" height="14" rx="3" class="c-mask"/>
-          <text x="407.5" y="311" class="t-backend" font-size="8" text-anchor="middle">启动并监管</text>
+        <g data-detail="context" data-edge-from="stdio-proxy" data-edge-to="server-process" data-edge-label="JSON-RPC 双向管道" data-edge-key="1" data-edge-id="server-stdio-link">
+          <rect x="801.7" y="311" width="91.6" height="14" rx="3" class="c-mask"/>
+          <text x="847.5" y="321" class="t-backend" font-size="8" text-anchor="middle">JSON-RPC 双向管道</text>
         </g>
-        <g data-detail="context" data-edge-from="router" data-edge-to="outboundRedactor" data-edge-label="tools/call" data-edge-key="2" data-edge-id="routerToOutbound">
-          <rect x="588.5" y="294" width="58" height="14" rx="3" class="c-mask"/>
-          <text x="617.5" y="304" class="t-backend" font-size="8" text-anchor="middle">tools/call</text>
+        <g data-detail="context" data-edge-from="startup-config" data-edge-to="stdio-proxy" data-edge-label="校验配置并启动" data-edge-key="2" data-edge-id="startup-initializes-proxy">
+          <rect x="596.4" y="130" width="77.2" height="14" rx="3" class="c-mask"/>
+          <text x="635" y="140" class="t-messagebus" font-size="8" text-anchor="middle">校验配置并启动</text>
         </g>
-        <g data-detail="context" data-edge-from="outboundRedactor" data-edge-to="policyGate" data-edge-label="脱敏参数" data-edge-key="3" data-edge-id="outboundToPolicy">
-          <rect x="798.3" y="331" width="48.4" height="14" rx="3" class="c-mask"/>
-          <text x="822.5" y="341" class="t-backend" font-size="8" text-anchor="middle">脱敏参数</text>
+        <g data-detail="context" data-edge-from="stdio-proxy" data-edge-to="discovery-checks" data-edge-label="tools/list 响应" data-edge-key="3" data-edge-id="proxy-dispatches-discovery">
+          <rect x="727" y="242" width="82" height="14" rx="3" class="c-mask"/>
+          <text x="768" y="252" class="t-security" font-size="8" text-anchor="middle">tools/list 响应</text>
         </g>
-        <g data-detail="context" data-edge-from="policyGate" data-edge-to="upstream" data-edge-label="允许后转发" data-edge-key="4" data-edge-id="policyToUpstream">
-          <rect x="1028.5" y="324" width="58" height="14" rx="3" class="c-mask"/>
-          <text x="1057.5" y="334" class="t-backend" font-size="8" text-anchor="middle">允许后转发</text>
+        <g data-detail="context" data-edge-from="discovery-checks" data-edge-to="fingerprint-state" data-edge-label="比对与留证" data-edge-key="4" data-edge-id="discovery-persists-fingerprints">
+          <rect x="1058.5" y="125" width="58" height="14" rx="3" class="c-mask"/>
+          <text x="1087.5" y="135" class="t-security" font-size="8" text-anchor="middle">比对与留证</text>
         </g>
-        <g data-detail="context" data-edge-from="upstream" data-edge-to="toolInspector" data-edge-label="tools/list 响应" data-edge-key="5" data-edge-id="upstreamToInspector">
-          <rect x="1054" y="427" width="82" height="14" rx="3" class="c-mask"/>
-          <text x="1095" y="437" class="t-backend" font-size="8" text-anchor="middle">tools/list 响应</text>
+        <g data-detail="context" data-edge-from="stdio-proxy" data-edge-to="call-checks" data-edge-label="tools/call 请求及响应" data-edge-key="5" data-edge-id="proxy-dispatches-call">
+          <rect x="712.6" y="380" width="110.8" height="14" rx="3" class="c-mask"/>
+          <text x="768" y="390" class="t-security" font-size="8" text-anchor="middle">tools/call 请求及响应</text>
         </g>
-        <g data-detail="context" data-edge-from="toolInspector" data-edge-to="inboundRedactor" data-edge-label="过滤后的响应" data-edge-key="6" data-edge-id="inspectorToInbound">
-          <rect x="826.2" y="523" width="67.6" height="14" rx="3" class="c-mask"/>
-          <text x="860" y="533" class="t-backend" font-size="8" text-anchor="middle">过滤后的响应</text>
+        <g data-detail="context" data-edge-from="stdio-proxy" data-edge-to="audit-module" data-edge-label="记录决策与耗时" data-edge-key="6" data-edge-id="proxy-records-decisions">
+          <rect x="596.4" y="409" width="77.2" height="14" rx="3" class="c-mask"/>
+          <text x="635" y="419" class="t-muted" font-size="8" text-anchor="middle">记录决策与耗时</text>
         </g>
-        <g data-detail="context" data-edge-from="inboundRedactor" data-edge-to="router" data-edge-label="脱敏结果" data-edge-key="7" data-edge-id="inboundToRouter">
-          <rect x="593.3" y="430.5" width="48.4" height="14" rx="3" class="c-mask"/>
-          <text x="617.5" y="440.5" class="t-backend" font-size="8" text-anchor="middle">脱敏结果</text>
-        </g>
-        <g data-detail="context" data-edge-from="config" data-edge-to="cli" data-edge-label="启动时严格校验" data-edge-key="8" data-edge-id="configToCli">
-          <rect x="266.4" y="179" width="77.2" height="14" rx="3" class="c-mask"/>
-          <text x="305" y="189" class="t-messagebus" font-size="8" text-anchor="middle">启动时严格校验</text>
-        </g>
-        <g data-detail="context" data-edge-from="toolInspector" data-edge-to="fingerprints" data-edge-label="TOFU / 变更比对" data-edge-key="9" data-edge-id="inspectorToFingerprints">
-          <rect x="1054" y="585" width="82" height="14" rx="3" class="c-mask"/>
-          <text x="1095" y="595" class="t-security" font-size="8" text-anchor="middle">TOFU / 变更比对</text>
-        </g>
-        <g data-detail="context" data-edge-from="router" data-edge-to="audit" data-edge-label="脱敏后记账" data-edge-key="10" data-edge-id="routerToAudit">
-          <rect x="483.5" y="391" width="58" height="14" rx="3" class="c-mask"/>
-          <text x="512.5" y="401" class="t-security" font-size="8" text-anchor="middle">脱敏后记账</text>
+        <g data-detail="context" data-edge-from="audit-module" data-edge-to="local-logs" data-edge-label="追加写入" data-edge-key="7" data-edge-id="audit-writes-files">
+          <rect x="368.3" y="455" width="48.4" height="14" rx="3" class="c-mask"/>
+          <text x="392.5" y="465" class="t-muted" font-size="8" text-anchor="middle">追加写入</text>
         </g>
 
         <!-- Boundary labels (foreground masks keep routes out of titles) -->
-        <g data-graph-role="structural-frame-label" data-composition-frame-id="0" data-composition-frame-kind="security-group" data-composition-frame-label="受信任的 mcp-guarder 进程边界">
-          <rect data-graph-role="structural-frame-label-mask" x="205" y="295" width="166.6" height="16" rx="3" class="c-mask"/>
-          <text data-boundary-label="" x="209" y="308" class="t-security" font-size="9" font-weight="600">受信任的 mcp-guarder 进程边界</text>
-        </g>
 
-        <g data-graph-role="structural-frame-label" data-composition-frame-id="1" data-composition-frame-kind="security-group" data-composition-frame-label="本地可信配置与证据边界">
-          <rect data-graph-role="structural-frame-label-mask" x="209" y="85" width="128.8" height="16" rx="3" class="c-mask"/>
-          <text data-boundary-label="" x="213" y="98" class="t-security" font-size="9" font-weight="600">本地可信配置与证据边界</text>
-        </g>
-
-        <g data-graph-role="structural-frame-label" data-composition-frame-id="2" data-composition-frame-kind="region" data-composition-frame-label="外部不可信执行域">
-          <rect data-graph-role="structural-frame-label-mask" x="1092" y="295" width="96.39999999999999" height="16" rx="3" class="c-mask"/>
-          <text data-boundary-label="" x="1096" y="308" class="t-cloud" font-size="9" font-weight="600">外部不可信执行域</text>
-        </g>
 
         <!-- Legend -->
         <g data-legend="" data-legend-bridge="">
-          <text x="40" y="724" class="t-primary" font-size="12" font-weight="650">图例</text>
-          <g data-legend-semantic-kind="backend" data-legend-kind="backend" data-legend-label="后端" data-legend-x="40" data-legend-baseline="744" data-legend-width="63">
-            <rect x="40" y="735" width="16" height="10" rx="2.5" class="c-backend" stroke-width="1"/>
-            <text x="62" y="744" class="t-muted" font-size="10" font-weight="500">后端</text>
+          <text x="40" y="564" class="t-primary" font-size="12" font-weight="650">图例</text>
+          <g data-legend-semantic-kind="backend" data-legend-kind="backend" data-legend-label="后端" data-legend-x="40" data-legend-baseline="584" data-legend-width="63">
+            <rect x="40" y="575" width="16" height="10" rx="2.5" class="c-backend" stroke-width="1"/>
+            <text x="62" y="584" class="t-muted" font-size="10" font-weight="500">后端</text>
           </g>
-          <g data-legend-semantic-kind="database" data-legend-kind="database" data-legend-label="数据库" data-legend-x="125" data-legend-baseline="744" data-legend-width="73">
-            <rect x="125" y="735" width="16" height="10" rx="2.5" class="c-database" stroke-width="1"/>
-            <text x="147" y="744" class="t-muted" font-size="10" font-weight="500">数据库</text>
+          <g data-legend-semantic-kind="database" data-legend-kind="database" data-legend-label="数据库" data-legend-x="125" data-legend-baseline="584" data-legend-width="73">
+            <rect x="125" y="575" width="16" height="10" rx="2.5" class="c-database" stroke-width="1"/>
+            <text x="147" y="584" class="t-muted" font-size="10" font-weight="500">数据库</text>
           </g>
-          <g data-legend-semantic-kind="security" data-legend-kind="security" data-legend-label="安全" data-legend-x="220" data-legend-baseline="744" data-legend-width="63">
-            <rect x="220" y="735" width="16" height="10" rx="2.5" class="c-security" stroke-width="1"/>
-            <text x="242" y="744" class="t-muted" font-size="10" font-weight="500">安全</text>
+          <g data-legend-semantic-kind="security" data-legend-kind="security" data-legend-label="安全" data-legend-x="220" data-legend-baseline="584" data-legend-width="63">
+            <rect x="220" y="575" width="16" height="10" rx="2.5" class="c-security" stroke-width="1"/>
+            <text x="242" y="584" class="t-muted" font-size="10" font-weight="500">安全</text>
           </g>
-          <g data-legend-semantic-kind="external" data-legend-kind="external" data-legend-label="外部系统" data-legend-x="305" data-legend-baseline="744" data-legend-width="83">
-            <rect x="305" y="735" width="16" height="10" rx="2.5" class="c-external" stroke-width="1"/>
-            <text x="327" y="744" class="t-muted" font-size="10" font-weight="500">外部系统</text>
+          <g data-legend-semantic-kind="external" data-legend-kind="external" data-legend-label="外部系统" data-legend-x="305" data-legend-baseline="584" data-legend-width="83">
+            <rect x="305" y="575" width="16" height="10" rx="2.5" class="c-external" stroke-width="1"/>
+            <text x="327" y="584" class="t-muted" font-size="10" font-weight="500">外部系统</text>
           </g>
         </g>
       </svg>
@@ -5448,36 +5399,33 @@
       <div class="card">
         <div class="card-header">
           <div class="card-dot cyan"></div>
-          <h3>主路径</h3>
+          <h3>先认清程序边界</h3>
         </div>
         <ul>
-          <li>&bull; 客户端请求按 JSON-RPC 行进入网关，只有 tools/list 与 tools/call 被深加工</li>
-          <li>&bull; 允许的调用以原始 argv 启动上游子进程，不经过 shell 拼接</li>
-          <li>&bull; 回流结果再次脱敏后，才写回协议专用 stdout</li>
+          <li>&bull; CLI、Proxy、安全检查和审计属于同一个 Python 进程</li>
+          <li>&bull; 主线表示双向连接；上游子进程负责真正执行工具</li>
         </ul>
       </div>
 
       <div class="card">
         <div class="card-header">
-          <div class="card-dot rose"></div>
-          <h3>安全语义</h3>
+          <div class="card-dot emerald"></div>
+          <h3>两类响应分开阅读</h3>
         </div>
         <ul>
-          <li>&bull; 策略无匹配、检测器故障、审计不可用时均采用 fail-closed</li>
-          <li>&bull; Tool 描述、inputSchema 与 annotations 会递归扫描投毒内容</li>
-          <li>&bull; 指纹变化保留新快照但不自动信任，用于持续识别 rug pull</li>
+          <li>&bull; tools/list 响应检查指纹与静态规则，不串入回流脱敏</li>
+          <li>&bull; tools/call 响应做脱敏；其他方法以原始字节透传</li>
         </ul>
       </div>
 
       <div class="card">
         <div class="card-header">
           <div class="card-dot amber"></div>
-          <h3>边界与持久化</h3>
+          <h3>保护有明确边界</h3>
         </div>
         <ul>
-          <li>&bull; 上游 MCP Server 位于外部不可信执行域</li>
-          <li>&bull; YAML 配置、SQLite 指纹与本地审计文件构成可信状态</li>
-          <li>&bull; 审计只接收已脱敏对象；写盘失败后阻断后续 tools/call</li>
+          <li>&bull; 只处理经过此代理的 stdio 消息，不是操作系统沙箱</li>
+          <li>&bull; 上游继承环境和 stderr；审计故障并非阻断所有方法</li>
         </ul>
       </div>
     </div>
@@ -5955,6 +5903,7 @@
         // View transforms and neighborhood focus are HTML exploration state,
         // never part of a downloaded full-diagram artifact.
         clone.style.removeProperty('transform');
+        clone.style.removeProperty('clip-path');
         clone.removeAttribute('data-view-scale');
         clone.removeAttribute('data-focus-active');
         clone.removeAttribute('data-reach-active');
@@ -6129,6 +6078,7 @@
           !clone.hasAttribute('data-chapter-anchor') &&
           !clone.hasAttribute('data-chapter-preview') &&
           !clone.style.getPropertyValue('transform') &&
+          !clone.style.getPropertyValue('clip-path') &&
           clone.querySelectorAll('[data-story-overlay], [data-story-carrier-overlay], [data-story-carrier-token], [data-story-step], [data-story-beat-state], [data-story-beat-step], [data-chapter-handoff-overlay], [data-chapter-role], [data-chapter-preview-role], [data-focus-match], [data-focus-selected], [data-reach-match], [data-reach-origin], [data-reach-depth], [data-semantic-lens-overlay], [data-lens-match], [data-lens-selected], [data-lens-peer], [data-legend-bridge], [data-legend-kind], [data-legend-bridge-runtime], [data-legend-count], [data-legend-zero], [data-legend-selected], [data-legend-preview-match], [data-legend-preview-selected], [data-legend-preview-peer], [data-relationship-hit-overlay], [data-relationship-pulse-overlay], [data-relationship-preview], [data-relationship-preview-node], [data-relationship-preview-source], [data-relationship-preview-target], [data-intent-trace-overlay], [data-intent-trace-match], [data-intent-trace-selected], [data-route-probe-overlay], [data-route-journey-overlay], [data-route-match], [data-route-start], [data-route-end], [data-route-step], [data-route-candidate], [data-route-journey-state], [data-route-journey-current], [data-share-route-match], [data-share-route-step], [data-share-route-start], [data-share-route-end], [data-share-route-middle], [data-share-reach-match], [data-share-reach-origin], [data-share-reach-depth], [data-source-evidence-beacon], [data-source-evidence-count], [data-source-evidence-original-label], [data-detail], [data-detail-anchor]').length === 0;
 
         var vb = svg.viewBox.baseVal;
@@ -11092,9 +11042,9 @@
 
     /* ============================================================
        Viewer Chrome Layout — keep HTML controls clear of the canonical SVG
-       legend without changing authored geometry. The dock keeps its existing
-       position unless its zero-reserve position would cover the legend; only
-       then does a small bottom safe rail become part of the reader budget.
+       stage without changing authored geometry. The dock keeps its floating
+       appearance while a small bottom stage rail becomes part of the reader
+       budget whenever its zero-reserve position would enter the stage.
        ============================================================ */
     Archify.viewerChromeLayout = (function () {
       var html = document.documentElement;
@@ -11105,10 +11055,13 @@
       var frame = 0;
       var settleFrame = 0;
       var reserve = 0;
-      var collisionLatched = false;
+      var railLatched = false;
       var probingBaseline = false;
       var probePromise = null;
       var baselineIntersectionArea = 0;
+      var baselineStageGap = null;
+      var restorableReserve = 0;
+      var probeFallbackReserve = 0;
       var lastReceipt = null;
       var SAFE_GAP = 10;
 
@@ -11125,14 +11078,61 @@
         var height = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
         return width * height;
       }
+      function protectedStageRect() {
+        if (!svg) return null;
+        var rect = svg.getBoundingClientRect();
+        var transform = '';
+        try { transform = window.getComputedStyle(svg).transform || ''; } catch (_) {}
+        var scaleX = 1;
+        var scaleY = 1;
+        var translateX = 0;
+        var translateY = 0;
+        var matrix = transform.match(/^matrix\(([^)]+)\)$/);
+        var matrix3d = transform.match(/^matrix3d\(([^)]+)\)$/);
+        if (matrix) {
+          var values = matrix[1].split(',').map(Number);
+          if (values.length === 6 && values.every(Number.isFinite)) {
+            scaleX = Math.abs(values[0]) || 1;
+            scaleY = Math.abs(values[3]) || 1;
+            translateX = values[4];
+            translateY = values[5];
+          }
+        } else if (matrix3d) {
+          var values3d = matrix3d[1].split(',').map(Number);
+          if (values3d.length === 16 && values3d.every(Number.isFinite)) {
+            scaleX = Math.abs(values3d[0]) || 1;
+            scaleY = Math.abs(values3d[5]) || 1;
+            translateX = values3d[12];
+            translateY = values3d[13];
+          }
+        }
+        var width = rect.width / scaleX;
+        var height = rect.height / scaleY;
+        var left = rect.left - translateX;
+        var top = rect.top - translateY;
+        return {
+          x: left,
+          y: top,
+          left: left,
+          top: top,
+          right: left + width,
+          bottom: top + height,
+          width: width,
+          height: height
+        };
+      }
       function eligible() {
         return Boolean(
-          container && svg && nav && legend &&
+          container && svg && nav &&
           window.innerWidth > 720 &&
           html.getAttribute('data-embed') !== 'true' &&
           (!window.matchMedia || !window.matchMedia('print').matches) &&
-          visible(nav) && visible(legend)
+          visible(nav)
         );
+      }
+      function cameraAtBaseline() {
+        var scale = Number(svg && svg.getAttribute('data-view-scale'));
+        return !Number.isFinite(scale) || Math.abs(scale - 1) < 0.001;
       }
       function writeReserve(next, options) {
         options = options || {};
@@ -11140,11 +11140,14 @@
         if (Math.abs(next - reserve) < 1) return false;
         reserve = next;
         if (reserve) {
+          if (options.remember !== false) restorableReserve = reserve;
           container.style.setProperty('--archify-nav-reserve', reserve + 'px');
-          container.setAttribute('data-nav-safe-rail', 'true');
+          container.setAttribute('data-nav-stage-rail', 'true');
+          html.setAttribute('data-nav-stage-rail', 'true');
         } else {
           container.style.removeProperty('--archify-nav-reserve');
-          container.removeAttribute('data-nav-safe-rail');
+          container.removeAttribute('data-nav-stage-rail');
+          html.removeAttribute('data-nav-stage-rail');
         }
         if (Archify.readerLayout && typeof Archify.readerLayout.schedule === 'function') {
           Archify.readerLayout.schedule();
@@ -11158,15 +11161,23 @@
         }
         return true;
       }
-      function clear() {
-        collisionLatched = false;
-        baselineIntersectionArea = 0;
+      function clear(options) {
+        options = options || {};
+        railLatched = false;
+        if (options.preserveBaseline !== true) {
+          baselineIntersectionArea = 0;
+          baselineStageGap = null;
+          restorableReserve = 0;
+        }
         writeReserve(0, { quiet: probingBaseline });
         lastReceipt = {
           eligible: false,
           active: false,
           reserve: 0,
           gap: SAFE_GAP,
+          baselineStageGap: null,
+          stageGap: null,
+          stageIntersectionArea: 0,
           baselineIntersectionArea: 0,
           intersectionArea: 0
         };
@@ -11175,50 +11186,93 @@
       function measure() {
         frame = 0;
         if (probingBaseline) return null;
-        if (!eligible()) return clear();
+        if (!eligible()) return clear({ preserveBaseline: !cameraAtBaseline() });
+
+        /* Camera transforms enlarge and translate authored paint inside the
+           fixed, clipped root SVG viewport. They must not redefine the
+           reader's baseline rail.
+           Restore that baseline after temporary mobile/embed/print states.
+           Camera Reset preserves the established rail while viewport, mode,
+           and content changes remain responsible for baseline reprobes. */
+        if (!cameraAtBaseline()) {
+          if (reserve === 0 && restorableReserve > 0) {
+            if (writeReserve(restorableReserve)) return null;
+          }
+          var cameraNavRect = nav.getBoundingClientRect();
+          var cameraLegendRect = visible(legend) ? legend.getBoundingClientRect() : null;
+          var cameraStageRect = protectedStageRect();
+          var cameraIntersectionArea = usable(cameraLegendRect) && intersectionArea(cameraNavRect, cameraStageRect) > 0
+            ? intersectionArea(cameraNavRect, cameraLegendRect)
+            : 0;
+          lastReceipt = {
+            eligible: true,
+            active: reserve > 0,
+            reserve: reserve,
+            gap: SAFE_GAP,
+            baselineStageGap: baselineStageGap == null ? null : Math.round(baselineStageGap * 100) / 100,
+            stageGap: Math.round((cameraNavRect.top - cameraStageRect.bottom) * 100) / 100,
+            stageIntersectionArea: Math.round(intersectionArea(cameraNavRect, cameraStageRect) * 100) / 100,
+            baselineIntersectionArea: Math.round(baselineIntersectionArea * 100) / 100,
+            intersectionArea: Math.round(cameraIntersectionArea * 100) / 100
+          };
+          return lastReceipt;
+        }
 
         var navRect = nav.getBoundingClientRect();
-        var legendRect = legend.getBoundingClientRect();
-        var svgRect = svg.getBoundingClientRect();
-        if (!usable(navRect) || !usable(legendRect) || !usable(svgRect)) return clear();
+        var legendRect = visible(legend) ? legend.getBoundingClientRect() : null;
+        var stageRect = protectedStageRect();
+        if (!usable(navRect) || !usable(stageRect)) return clear();
 
-        var actualIntersectionArea = intersectionArea(navRect, legendRect);
-        if (!collisionLatched && reserve === 0) {
+        var actualIntersectionArea = usable(legendRect) ? intersectionArea(navRect, legendRect) : 0;
+        var stageGap = navRect.top - stageRect.bottom;
+        if (!railLatched && reserve === 0) {
           baselineIntersectionArea = actualIntersectionArea;
-          if (actualIntersectionArea > 0) {
-            collisionLatched = true;
-            if (writeReserve(Math.max(0, svgRect.bottom + SAFE_GAP - navRect.top))) return null;
+          baselineStageGap = stageGap;
+          if (stageGap < SAFE_GAP) {
+            railLatched = true;
+            if (writeReserve(Math.max(0, SAFE_GAP - stageGap))) return null;
           }
-        } else if (collisionLatched && reserve > 0 && actualIntersectionArea > 0) {
-          /* Once zero-reserve geometry proves a collision, keep that decision
-             latched while Adaptive Reader incorporates the rail. If the first
-             rail is not quite tall enough (notably in Presentation flex
-             layout), grow only by the remaining vertical overlap. */
-          var remaining = Math.max(1, legendRect.bottom + SAFE_GAP - navRect.top);
+        } else if (railLatched && reserve > 0 && stageGap < SAFE_GAP) {
+          /* Keep the decision latched while Adaptive Reader incorporates the
+             rail. Presentation and rounded layout values can require one
+             bounded follow-up before the full stage gap is established. */
+          var remaining = Math.max(1, SAFE_GAP - stageGap);
           if (writeReserve(reserve + remaining)) return null;
         }
 
         navRect = nav.getBoundingClientRect();
-        legendRect = legend.getBoundingClientRect();
+        legendRect = visible(legend) ? legend.getBoundingClientRect() : null;
+        stageRect = protectedStageRect();
+        stageGap = navRect.top - stageRect.bottom;
         lastReceipt = {
           eligible: true,
           active: reserve > 0,
           reserve: reserve,
           gap: SAFE_GAP,
+          baselineStageGap: baselineStageGap == null ? null : Math.round(baselineStageGap * 100) / 100,
+          stageGap: Math.round(stageGap * 100) / 100,
+          stageIntersectionArea: Math.round(intersectionArea(navRect, stageRect) * 100) / 100,
           baselineIntersectionArea: Math.round(baselineIntersectionArea * 100) / 100,
-          intersectionArea: Math.round(intersectionArea(navRect, legendRect) * 100) / 100
+          intersectionArea: Math.round((usable(legendRect) ? intersectionArea(navRect, legendRect) : 0) * 100) / 100
         };
         return lastReceipt;
       }
       function reprobe() {
         if (probingBaseline) return probePromise || Promise.resolve(false);
-        if (!reserve && !collisionLatched) {
+        if (!cameraAtBaseline()) {
           schedule();
           return Promise.resolve(false);
         }
+        if (!reserve && !railLatched && !restorableReserve) {
+          schedule();
+          return Promise.resolve(false);
+        }
+        probeFallbackReserve = restorableReserve || reserve;
         probingBaseline = true;
-        collisionLatched = false;
+        railLatched = false;
         baselineIntersectionArea = 0;
+        baselineStageGap = null;
+        restorableReserve = 0;
         writeReserve(0, { quiet: true });
         var readerReady = Archify.readerLayout && typeof Archify.readerLayout.whenStable === 'function'
           ? Archify.readerLayout.whenStable().catch(function () {})
@@ -11226,6 +11280,10 @@
         probePromise = readerReady.then(function () {
           probingBaseline = false;
           probePromise = null;
+          if (!cameraAtBaseline() && probeFallbackReserve > 0) {
+            restorableReserve = probeFallbackReserve;
+          }
+          probeFallbackReserve = 0;
           schedule();
           return true;
         });
@@ -11247,8 +11305,8 @@
           Math.round(navRect.top * 100) / 100,
           Math.round(legendRect.left * 100) / 100,
           Math.round(legendRect.top * 100) / 100,
-          collisionLatched ? 'latched' : 'clear',
-          lastReceipt ? lastReceipt.intersectionArea : ''
+          railLatched ? 'latched' : 'clear',
+          lastReceipt ? lastReceipt.stageGap : ''
         ].join('|');
       }
       function whenStable() {
@@ -11267,7 +11325,7 @@
       if (document.fonts && document.fonts.ready) document.fonts.ready.then(reprobe).catch(function () {});
       if (typeof ResizeObserver === 'function') {
         var resizeObserver = new ResizeObserver(schedule);
-        [nav, legend].forEach(function (element) { if (element) resizeObserver.observe(element); });
+        [nav, svg, legend].forEach(function (element) { if (element) resizeObserver.observe(element); });
       }
       if (typeof MutationObserver === 'function') {
         var contentObserver = new MutationObserver(function (records) {
@@ -11288,6 +11346,7 @@
         schedule: schedule,
         reprobe: reprobe,
         whenStable: whenStable,
+        stageRect: protectedStageRect,
         active: function () { return reserve > 0; },
         receipt: function () { return lastReceipt || measure(); }
       };
@@ -11307,6 +11366,7 @@
       var cameraFrame = null;
       var cameraGeneration = 0;
       var cameraTransaction = null;
+      var clipFrame = 0;
       var resizeFrame = 0;
       var autoScrollUntil = 0;
 
@@ -11392,9 +11452,43 @@
         container.setAttribute('data-camera-mode', state.mode);
         container.setAttribute('data-camera-indicator', semantic ? 'true' : 'false');
       }
+      function clipToViewport(camera) {
+        camera = camera || state;
+        if (camera.scale <= 1.001) {
+          svg.style.removeProperty('clip-path');
+          return;
+        }
+        var width = svg.clientWidth || 1;
+        var height = svg.clientHeight || 1;
+        var scale = camera.scale;
+        var top = Math.max(0, Math.min(height, -camera.y / scale));
+        var left = Math.max(0, Math.min(width, -camera.x / scale));
+        var right = Math.max(0, Math.min(width, width - (width - camera.x) / scale));
+        var bottom = Math.max(0, Math.min(height, height - (height - camera.y) / scale));
+        svg.style.clipPath = 'inset(' + [top, right, bottom, left].map(function (value) {
+          return Math.round(value * 1000) / 1000 + 'px';
+        }).join(' ') + ')';
+      }
+      function cameraSettled(rendered) {
+        return Math.abs(rendered.scale - state.scale) < 0.001 &&
+          Math.abs(rendered.x - state.x) < 0.05 &&
+          Math.abs(rendered.y - state.y) < 0.05;
+      }
+      function syncViewportClip() {
+        if (clipFrame) cancelAnimationFrame(clipFrame);
+        clipFrame = 0;
+        function sample() {
+          clipFrame = 0;
+          var rendered = sampleRenderedState();
+          clipToViewport(rendered);
+          if (!cameraSettled(rendered)) clipFrame = requestAnimationFrame(sample);
+        }
+        sample();
+      }
       function apply() {
         clamp();
         svg.style.transform = 'translate(' + state.x + 'px,' + state.y + 'px) scale(' + state.scale + ')';
+        syncViewportClip();
         renderControls();
         outBtn.disabled = state.scale <= 1;
         inBtn.disabled = state.scale >= 3;
@@ -11516,9 +11610,6 @@
         else stopCameraMotion('reset', false);
         state = { scale: 1, x: 0, y: 0, mode: 'overview' };
         apply();
-        if (Archify.viewerChromeLayout && typeof Archify.viewerChromeLayout.reprobe === 'function') {
-          Archify.viewerChromeLayout.reprobe();
-        }
       }
       function centerAt(logicalX, logicalY, options) {
         options = options || {};

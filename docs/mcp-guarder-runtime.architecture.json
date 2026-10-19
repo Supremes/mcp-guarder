@@ -2,250 +2,176 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "mcp-guarder 高层运行时架构",
+    "title": "mcp-guarder 代码阅读架构",
     "locale": "zh-CN",
     "output": "mcp-guarder-runtime.html",
     "quality_profile": "showcase",
-    "viewBox": [1320, 760]
+    "viewBox": [1300, 600]
   },
   "components": [
     {
-      "id": "agent",
+      "id": "mcp-client",
       "type": "external",
-      "label": "AI Agent / MCP 客户端",
-      "sublabel": "Claude Code 等",
-      "pos": [30, 315],
-      "size": [150, 72]
+      "label": "MCP 客户端",
+      "sublabel": "发请求、接收工具结果",
+      "pos": [60, 286],
+      "size": [225, 90]
     },
     {
-      "id": "cli",
+      "id": "startup-config",
       "type": "backend",
-      "label": "CLI 与进程监管",
-      "sublabel": "mcp-guarder -- <command>",
-      "pos": [225, 315],
-      "size": [160, 72]
+      "label": "命令入口与配置",
+      "sublabel": "cli.py + config.py",
+      "pos": [500, 30],
+      "size": [270, 90]
     },
     {
-      "id": "router",
+      "id": "stdio-proxy",
       "type": "backend",
-      "label": "stdio 双向代理",
-      "sublabel": "JSON-RPC 按行路由",
-      "tag": "stdout 协议专用",
-      "pos": [430, 315],
-      "size": [165, 72]
+      "label": "Proxy 双向转发主干",
+      "sublabel": "proxy.py / IdLedger / Routed",
+      "tag": "按行读写，按 id 识别响应",
+      "pos": [500, 286],
+      "size": [270, 90]
     },
     {
-      "id": "outboundRedactor",
-      "type": "security",
-      "label": "出站 Secret 脱敏",
-      "sublabel": "params.arguments",
-      "pos": [640, 315],
-      "size": [160, 72]
-    },
-    {
-      "id": "policyGate",
-      "type": "security",
-      "label": "默认拒绝权限门",
-      "sublabel": "首条匹配规则定案",
-      "tag": "fail-closed",
-      "pos": [845, 315],
-      "size": [160, 72]
-    },
-    {
-      "id": "upstream",
+      "id": "server-process",
       "type": "external",
       "label": "上游 MCP Server",
-      "sublabel": "不可信子进程",
-      "pos": [1110, 315],
-      "size": [170, 72]
+      "sublabel": "真正执行工具的子进程",
+      "tag": "每次会话启动一次",
+      "pos": [925, 286],
+      "size": [325, 90]
     },
     {
-      "id": "toolInspector",
+      "id": "discovery-checks",
       "type": "security",
-      "label": "Tool 描述检查",
-      "sublabel": "静态投毒 + 指纹变更",
-      "tag": "tools/list",
-      "pos": [900, 505],
-      "size": [180, 76]
+      "label": "工具发现检查",
+      "sublabel": "fingerprint.py + static_checks.py",
+      "tag": "剥离被判定有风险的工具",
+      "pos": [925, 145],
+      "size": [325, 90]
     },
     {
-      "id": "inboundRedactor",
+      "id": "call-checks",
       "type": "security",
-      "label": "回流 Secret 脱敏",
-      "sublabel": "result / structuredContent",
-      "pos": [640, 505],
-      "size": [180, 76]
+      "label": "工具调用检查",
+      "sublabel": "redact.py + policy.py",
+      "tag": "请求先脱敏再判权限；响应脱敏",
+      "pos": [925, 430],
+      "size": [325, 90]
     },
     {
-      "id": "config",
-      "type": "external",
-      "label": "YAML 配置",
-      "sublabel": "策略 / 检测 / 审计",
-      "pos": [225, 105],
-      "size": [160, 70]
-    },
-    {
-      "id": "fingerprints",
+      "id": "fingerprint-state",
       "type": "database",
-      "label": "指纹库",
-      "sublabel": "SQLite + Tool 快照",
-      "pos": [1110, 505],
-      "size": [170, 76]
+      "label": "指纹与工具快照",
+      "sublabel": "SQLite + JSON 快照",
+      "pos": [925, 20],
+      "size": [325, 78]
     },
     {
-      "id": "audit",
+      "id": "audit-module",
+      "type": "backend",
+      "label": "审计与诊断",
+      "sublabel": "audit.py",
+      "tag": "审计故障阻断 tools/call",
+      "pos": [500, 430],
+      "size": [270, 90]
+    },
+    {
+      "id": "local-logs",
       "type": "database",
-      "label": "审计与 Guard 日志",
-      "sublabel": "JSONL + 本地文件",
-      "tag": "脱敏后写入",
-      "pos": [430, 505],
-      "size": [165, 76]
-    }
-  ],
-  "boundaries": [
-    {
-      "kind": "security-group",
-      "label": "受信任的 mcp-guarder 进程边界",
-      "wraps": [
-        "cli",
-        "router",
-        "outboundRedactor",
-        "policyGate",
-        "toolInspector",
-        "inboundRedactor"
-      ],
-      "pad": 24
-    },
-    {
-      "kind": "security-group",
-      "label": "本地可信配置与证据边界",
-      "wraps": [
-        "config",
-        "fingerprints",
-        "audit"
-      ],
-      "pad": 20
-    },
-    {
-      "kind": "region",
-      "label": "外部不可信执行域",
-      "wraps": [
-        "upstream"
-      ],
-      "pad": 22
+      "label": "本地日志文件",
+      "sublabel": "JSONL + guard.log",
+      "pos": [60, 430],
+      "size": [225, 90]
     }
   ],
   "connections": [
     {
-      "id": "agentToCli",
-      "from": "agent",
-      "to": "cli",
-      "label": "JSON-RPC / stdio",
-      "variant": "emphasis",
-      "labelDy": 67
-    },
-    {
-      "id": "cliToRouter",
-      "from": "cli",
-      "to": "router",
-      "label": "启动并监管",
-      "variant": "emphasis",
-      "labelDy": -30
-    },
-    {
-      "id": "routerToOutbound",
-      "from": "router",
-      "to": "outboundRedactor",
-      "label": "tools/call",
-      "variant": "emphasis",
-      "labelDy": -30
-    },
-    {
-      "id": "outboundToPolicy",
-      "from": "outboundRedactor",
-      "to": "policyGate",
-      "label": "脱敏参数",
+      "id": "client-stdio-link",
+      "from": "mcp-client",
+      "to": "stdio-proxy",
+      "label": "JSON-RPC 双向 stdio",
       "variant": "emphasis"
     },
     {
-      "id": "policyToUpstream",
-      "from": "policyGate",
-      "to": "upstream",
-      "label": "允许后转发",
+      "id": "server-stdio-link",
+      "from": "stdio-proxy",
+      "to": "server-process",
+      "label": "JSON-RPC 双向管道",
       "variant": "emphasis"
     },
     {
-      "id": "upstreamToInspector",
-      "from": "upstream",
-      "to": "toolInspector",
-      "label": "tools/list 响应",
-      "variant": "emphasis"
-    },
-    {
-      "id": "inspectorToInbound",
-      "from": "toolInspector",
-      "to": "inboundRedactor",
-      "label": "过滤后的响应",
-      "variant": "emphasis"
-    },
-    {
-      "id": "inboundToRouter",
-      "from": "inboundRedactor",
-      "to": "router",
-      "label": "脱敏结果",
-      "variant": "emphasis"
-    },
-    {
-      "id": "configToCli",
-      "from": "config",
-      "to": "cli",
-      "label": "启动时严格校验",
+      "id": "startup-initializes-proxy",
+      "from": "startup-config",
+      "to": "stdio-proxy",
+      "label": "校验配置并启动",
       "variant": "dashed",
-      "labelDy": 24
+      "labelAt": [635, 140]
     },
     {
-      "id": "inspectorToFingerprints",
-      "from": "toolInspector",
-      "to": "fingerprints",
-      "label": "TOFU / 变更比对",
+      "id": "proxy-dispatches-discovery",
+      "from": "stdio-proxy",
+      "to": "discovery-checks",
+      "label": "tools/list 响应",
       "variant": "security",
-      "labelDy": 55
+      "fromSide": "top",
+      "toSide": "left"
     },
     {
-      "id": "routerToAudit",
-      "from": "router",
-      "to": "audit",
-      "label": "脱敏后记账",
+      "id": "discovery-persists-fingerprints",
+      "from": "discovery-checks",
+      "to": "fingerprint-state",
+      "label": "比对与留证",
+      "variant": "security"
+    },
+    {
+      "id": "proxy-dispatches-call",
+      "from": "stdio-proxy",
+      "to": "call-checks",
+      "label": "tools/call 请求及响应",
       "variant": "security",
-      "labelDy": 24
+      "fromSide": "bottom",
+      "toSide": "left"
+    },
+    {
+      "id": "proxy-records-decisions",
+      "from": "stdio-proxy",
+      "to": "audit-module",
+      "label": "记录决策与耗时",
+      "labelAt": [635, 419]
+    },
+    {
+      "id": "audit-writes-files",
+      "from": "audit-module",
+      "to": "local-logs",
+      "label": "追加写入"
     }
   ],
   "cards": [
     {
       "dot": "cyan",
-      "title": "主路径",
+      "title": "先认清程序边界",
       "items": [
-        "客户端请求按 JSON-RPC 行进入网关，只有 tools/list 与 tools/call 被深加工",
-        "允许的调用以原始 argv 启动上游子进程，不经过 shell 拼接",
-        "回流结果再次脱敏后，才写回协议专用 stdout"
+        "CLI、Proxy、安全检查和审计属于同一个 Python 进程",
+        "主线表示双向连接；上游子进程负责真正执行工具"
       ]
     },
     {
-      "dot": "rose",
-      "title": "安全语义",
+      "dot": "emerald",
+      "title": "两类响应分开阅读",
       "items": [
-        "策略无匹配、检测器故障、审计不可用时均采用 fail-closed",
-        "Tool 描述、inputSchema 与 annotations 会递归扫描投毒内容",
-        "指纹变化保留新快照但不自动信任，用于持续识别 rug pull"
+        "tools/list 响应检查指纹与静态规则，不串入回流脱敏",
+        "tools/call 响应做脱敏；其他方法以原始字节透传"
       ]
     },
     {
       "dot": "amber",
-      "title": "边界与持久化",
+      "title": "保护有明确边界",
       "items": [
-        "上游 MCP Server 位于外部不可信执行域",
-        "YAML 配置、SQLite 指纹与本地审计文件构成可信状态",
-        "审计只接收已脱敏对象；写盘失败后阻断后续 tools/call"
+        "只处理经过此代理的 stdio 消息，不是操作系统沙箱",
+        "上游继承环境和 stderr；审计故障并非阻断所有方法"
       ]
     }
   ]

@@ -3,7 +3,9 @@
 一个 Python 写的 **MCP 安全网关**，以 stdio wrapper 的形式透明坐在 AI Agent 和 MCP Server 之间，干四件事：
 **tool 描述投毒检测 · 默认拒绝的权限门 · 双向 secret 脱敏 · 结构化审计**。
 
-状态：spec 阶段，还没有代码。设计见 [SPEC.md](./SPEC.md)。
+状态：已有 stdio 代理、安全检查、审计与演示代码。设计见 [SPEC.md](./SPEC.md)。
+
+初次读源码：从[代码全流程阅读指南](docs/code-reading-guide.md)开始，配合[交互式架构图](docs/mcp-guarder-runtime.html)查看模块关系。
 
 ## 解决什么问题
 
