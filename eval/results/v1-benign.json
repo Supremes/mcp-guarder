@@ -1,0 +1,183 @@
+{
+  "meta": {
+    "rules_version": "v1",
+    "rules_sha256": "851ef15bd20d09e33d26e52fcde8e46afb3e6ddb6ef06bf72ee763b18f278760",
+    "rule_ids": [
+      "hidden-instruction-tag",
+      "ignore-previous",
+      "read-extra-file",
+      "do-not-tell-user",
+      "base64-blob",
+      "ansi-escape",
+      "cross-server-ref",
+      "priority-override",
+      "regardless-of-user",
+      "cross-tool-precondition",
+      "must-call-tool",
+      "argument-tampering",
+      "argument-to-literal",
+      "when-using-rewrite",
+      "always-rewrite",
+      "before-trigger-tool",
+      "sensitive-system-file",
+      "must-redirect",
+      "must-be-rerouted"
+    ],
+    "split": "benign",
+    "split_sha256": "d0bca28ceb316ab568bb4689d723ab8b25bbb77aa34d74888e0cdad7dcd899df",
+    "dataset": "zhiqiangwang4/MCPTox-Benchmark@f85189f9ad12504c197c7f920ab818a40657b1fa",
+    "dataset_sha256": {
+      "pure_tool.json": "54b1eb0e9d7b2f18465266aa9d9dfda828cd558b1269b74731ec2c5d8579e617",
+      "response_all.json": "79a90049be931c59e71446d6180b1d7f0d196d123d08a59bc155d142b5041c03"
+    },
+    "loader_version": 2,
+    "code_commit": "ddf4f79108d5cac70a6309435c3600a48b10b19f-dirty",
+    "servers": [
+      "github"
+    ],
+    "run_at": "2026-10-21T06:25:24+00:00"
+  },
+  "counts": {
+    "samples": 141,
+    "scanned": 141,
+    "poisoned": 0,
+    "clean": 141,
+    "scan_errors": 0
+  },
+  "recall": {
+    "k": 0,
+    "n": 0,
+    "rate": null,
+    "ci95": null
+  },
+  "false_positive_rate": {
+    "k": 2,
+    "n": 141,
+    "rate": 0.0142,
+    "ci95": [
+      0.0039,
+      0.0502
+    ]
+  },
+  "precision": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0,
+    "ci95": [
+      0.0,
+      0.6576
+    ]
+  },
+  "recall_by_paradigm": {},
+  "recall_by_risk": {},
+  "recall_by_server": {},
+  "false_positives_by_server": {
+    "github": 2
+  },
+  "per_rule": {
+    "hidden-instruction-tag": {
+      "poisoned_hits": 0,
+      "clean_hits": 0,
+      "unique_poisoned_hits": 0
+    },
+    "ignore-previous": {
+      "poisoned_hits": 0,
+      "clean_hits": 0,
+      "unique_poisoned_hits": 0
+    },
+    "read-extra-file": {
+      "poisoned_hits": 0,
+      "clean_hits": 0,
+      "unique_poisoned_hits": 0
+    },
+    "do-not-tell-user": {
+      "poisoned_hits": 0,
+      "clean_hits": 0,
+      "unique_poisoned_hits": 0
+    },
+    "base64-blob": {
+      "poisoned_hits": 0,
+      "clean_hits": 0,
+      "unique_poisoned_hits": 0
+    },
+    "ansi-escape": {
+      "poisoned_hits": 0,
+      "clean_hits": 0,
+      "unique_poisoned_hits": 0
+    },
+    "cross-server-ref": {
+      "poisoned_hits": 0,
+      "clean_hits": 0,
+      "unique_poisoned_hits": 0
+    },
+    "priority-override": {
+      "poisoned_hits": 0,
+      "clean_hits": 0,
+      "unique_poisoned_hits": 0
+    },
+    "regardless-of-user": {
+      "poisoned_hits": 0,
+      "clean_hits": 0,
+      "unique_poisoned_hits": 0
+    },
+    "cross-tool-precondition": {
+      "poisoned_hits": 0,
+      "clean_hits": 0,
+      "unique_poisoned_hits": 0
+    },
+    "must-call-tool": {
+      "poisoned_hits": 0,
+      "clean_hits": 0,
+      "unique_poisoned_hits": 0
+    },
+    "argument-tampering": {
+      "poisoned_hits": 0,
+      "clean_hits": 2,
+      "unique_poisoned_hits": 0
+    },
+    "argument-to-literal": {
+      "poisoned_hits": 0,
+      "clean_hits": 0,
+      "unique_poisoned_hits": 0
+    },
+    "when-using-rewrite": {
+      "poisoned_hits": 0,
+      "clean_hits": 0,
+      "unique_poisoned_hits": 0
+    },
+    "always-rewrite": {
+      "poisoned_hits": 0,
+      "clean_hits": 0,
+      "unique_poisoned_hits": 0
+    },
+    "before-trigger-tool": {
+      "poisoned_hits": 0,
+      "clean_hits": 0,
+      "unique_poisoned_hits": 0
+    },
+    "sensitive-system-file": {
+      "poisoned_hits": 0,
+      "clean_hits": 0,
+      "unique_poisoned_hits": 0
+    },
+    "must-redirect": {
+      "poisoned_hits": 0,
+      "clean_hits": 0,
+      "unique_poisoned_hits": 0
+    },
+    "must-be-rerouted": {
+      "poisoned_hits": 0,
+      "clean_hits": 0,
+      "unique_poisoned_hits": 0
+    }
+  },
+  "scan_errors": [],
+  "hits": {
+    "github:custom_properties_write": [
+      "argument-tampering"
+    ],
+    "github:set_issue_fields": [
+      "argument-tampering"
+    ]
+  }
+}

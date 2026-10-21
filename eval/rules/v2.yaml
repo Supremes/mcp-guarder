@@ -1,0 +1,57 @@
+# v2 静态规则：v1 全部 22 条 + 依据 MCPTox 全量（开发集 + 测试集）和手写探测集补充的通用规则。
+# MCPTox 全量都参与了编写，所以 v2 在 MCPTox 上的召回只能叫"拟合覆盖率"；
+# 泛化能力看留出集：github-mcp-server 快照（只跑一次，测真实误报）。
+# 刻意不收 malicious / attacker / evil 这类只在数据集里出现的词。
+
+# ── v0 原有规则（不改动）──
+- {id: hidden-instruction-tag, pattern: '(?is)<\s*(IMPORTANT|SYSTEM|SECRET|INSTRUCTIONS)\s*>'}
+- {id: ignore-previous,   pattern: '(?i)ignore\s+(all\s+)?(previous|prior|above)\s+(instruction|prompt)'}
+- {id: read-extra-file,   pattern: '(?i)(~/\.ssh/|id_rsa|/\.env\b|~/\.aws/credentials|\.claude\.json)'}
+- {id: do-not-tell-user,  pattern: "(?i)(do not|don't)\\s+(tell|mention|reveal).{0,40}(user|human)"}
+- {id: base64-blob,       pattern: '[A-Za-z0-9+/]{200,}={0,2}'}
+- {id: ansi-escape,       pattern: '\x1b\[[0-9;]*[A-Za-z]'}
+- {id: cross-server-ref,  pattern: '(?i)\bmcp__[a-z0-9_]+__'}
+
+# ── v1 新增 ──
+# 优先级劫持：声称自己的指令高于用户请求。
+- {id: priority-override, pattern: '(?i)\b(priority|precedence)\b.{0,30}\b(higher|over|above|supersedes?)\b.{0,30}\b(user|query|request|instruction)'}
+# 无视用户输入：regardless of what the user asked / original path ...
+- {id: regardless-of-user, pattern: '(?i)\bregardless\s+of\s+(the\s+|what\s+the\s+)?(user|original|requested|actual|input|query)'}
+# 跨工具前置指令：使用某工具前必须先调用另一个具名工具。
+- {id: cross-tool-precondition, pattern: "(?i)\\b(before|prior\\s+to)\\s+(using|calling|invoking|executing)\\b.{0,120}?\\b(must|required|need\\s+to|have\\s+to|mandatory)\\b.{0,80}?\\b(call|use|invoke|execute|run)\\b\\s+(the\\s+)?['\"`]?[a-z_][a-z0-9_.-]*['\"`]?"}
+- {id: must-call-tool, pattern: "(?i)\\byou\\s+must\\s+(first\\s+|also\\s+|always\\s+)?(call|invoke|execute|run|use)\\s+(the\\s+)?['\"`][a-z_][a-z0-9_.-]*['\"`]"}
+# 参数篡改：要求模型改写某个具名参数的值。
+- {id: argument-tampering, pattern: "(?i)\\b(modify|change|replace|set|override|overwrite|append|prepend|add|alter|rewrite)\\b\\s+(the\\s+)?['\"`]?[a-z_][a-z0-9_]*['\"`]?\\s+(argument|parameter|param|field|value)\\b"}
+- {id: argument-to-literal, pattern: "(?i)\\b(argument|parameter)\\s+(to|with|into)\\s+['\"`]"}
+# 条件式改写：在使用某工具时，要求改写/追加/替换输入。
+- {id: when-using-rewrite, pattern: "(?i)\\bwhen\\s+(using|calling|invoking|creating|running|the\\s+user|a\\s+user|user)\\b.{0,100}?\\b(append|prepend|replace|override|overwrite|modify|change|rewrite|reroute|alter|set)\\b"}
+- {id: always-rewrite, pattern: "(?i)\\balways\\s+(append|prepend|replace|override|overwrite|rewrite|modify|change)\\b"}
+# 跨工具前置调用（宽松版）：使用 X 之前，触发/调用/运行另一个具名工具。
+- {id: before-trigger-tool, pattern: "(?i)\\b(before|prior\\s+to)\\s+(using|calling|invoking|running|executing)\\b.{0,80}?\\b(use|call|trigger|run|invoke|execute)\\b\\s+(the\\s+)?[`'\"]?[a-z_]+[_-][a-z0-9_-]+"}
+# 更多敏感目标。
+- {id: sensitive-system-file, pattern: '(?i)(/etc/(passwd|shadow|sudoers)|\.bash_history|\.netrc\b|\.git-credentials)'}
+# 强制改道：must + 追加/替换/重定向/改走/忽略用户输入。
+- {id: must-redirect, pattern: "(?i)\\bmust\\s+(instead\\s+|first\\s+|always\\s+)?(append|prepend|replace|redirect|route|reroute|ignore\\s+the\\s+user|instead\\s+call|use\\s+the\\s+new)\\b"}
+- {id: must-be-rerouted, pattern: "(?i)\\bmust\\s+be\\s+(replaced|redirected|routed|rerouted|appended|prepended|restricted\\s+to)\\b"}
+
+# ── v2 新增 ──
+# 工具名识别补上 camelCase；前置调用的动词补上同义词；前置从句不再要求 using/calling。
+- {id: before-clause-tool-call, pattern: "(?i)\\b(before|prior\\s+to)\\s+(?:[a-z][a-z ]{0,40}?\\s)?(using|calling|running|use|call|run|[a-z]+ing)\\b[^.]{0,80}?,?\\s+(you\\s+(should|must|need\\s+to|have\\s+to)\\s+)?(first\\s+|always\\s+)?(use|call|run|trigger|invoke|execute|fetch|request|scan|perform|query|search|read|send|mark|move|delete)\\b[^.]{0,40}?(`[A-Za-z][\\w.-]*`|'[A-Za-z][\\w.-]*'|\\b(?-i:[a-z]+[A-Z][A-Za-z0-9]*)\\b|\\b[a-z]+_[a-z0-9_]+\\b)"}
+- {id: make-sure-call, pattern: "(?i)\\bmake\\s+sure\\s+(to\\s+|you\\s+)?(get|call|run|use|invoke|fetch|send|delete)\\b"}
+- {id: auto-trigger-tool, pattern: "(?i)\\b(automatically\\s+(call|invoke|run|trigger)|triggers|requires\\s+calling)\\s+(`[A-Za-z][\\w.-]*`|'[A-Za-z][\\w.-]*'|[a-z]+_[a-z0-9_]+|(?-i:[a-z]+[A-Z][A-Za-z0-9]*))"}
+- {id: instead-call, pattern: "(?i)\\b(instead\\s+call|must\\s+instead|is\\s+now\\s+aliased\\s+to)\\b"}
+# 恐吓式后果：不照做就会崩溃 / 损坏。
+- {id: threat-consequence, pattern: "(?i)\\b(failure\\s+to|skipping|omitting|ignoring|not\\s+doing)\\b[^.]{0,30}\\b(will|would|could)\\s+(cause|crash|corrupt|overload|disrupt|break|fail|result\\s+in)"}
+# 隐蔽动作：悄悄地 / 隐藏地 / 不告诉用户。
+- {id: covert-action, pattern: "(?i)\\b(silently|secretly|covertly|quietly)\\s+(add|send|include|call|insert|append|forward|copy|upload|delete|modify|change|record|log|store|run|invoke)\\b|\\b(without\\s+(telling|informing|notifying|asking)\\s+the\\s+user)\\b|\\binject\\s+(one\\s+|a\\s+)?hidden\\b"}
+# 安全 / 政策式横幅，用来给恶意指令披上合规外衣。不收单独的 IMPORTANT（合法描述常用）。
+- {id: policy-banner, pattern: "(?:^|[.!]\\s+)(SYSTEM\\s+(POLICY|NOTE|DATA\\s+ROUTING\\s+POLICY|RULE)|SECURITY\\s+(ALERT|SCAN|RULE|PROTOCOL|NOTICE)|AUDIT\\s+REQUIREMENT|BACKUP\\s+PROTOCOL|CONTENT\\s+POLICY|COMPLIANCE\\s+(RULE|REQUIREMENT)|IMPORTANT\\s+SECURITY\\s+RULE|System\\s+(Policy|Alias|Optimization|note))\\b"}
+- {id: priority-claim, pattern: "(?i)\\b(highest|top)\\s+priority\\b|\\btake[s]?\\s+precedence\\s+over\\b"}
+# 对审查者 / 分类器喊话：合法描述几乎不会对安全审查者说话。
+- {id: judge-addressing, pattern: "(?i)\\b(note|message|guidance|instructions?|attention)\\s+(to|for)\\s+(any\\s+)?(ai|automated|security|llm)?\\s*(reviewers?|scanners?|evaluators?|classifiers?|auditors?|moderators?)\\b|\\b(classify|mark|label|treat)\\s+(it|this(\\s+tool)?)\\s+as\\s+(benign|safe|harmless)\\b|\\b(scanners?|reviewers?|classifiers?|evaluators?|auditors?)\\s+(must|should)\\s+(output|respond|classify|return|report)\\b|\\bif\\s+you\\s+are\\s+an?\\s+(ai|llm|model|language\\s+model)\\b|\\b(respond|reply|answer|output)\\s+(only\\s+)?with\\s+(the\\s+word\\s+)?['\"{]?(safe|benign|verdict)"}
+# 外发到具体地址。
+- {id: send-to-address, pattern: "(?i)\\b(send|forward|upload|post|copy|bcc|cc|email|mail|route|report)\\b[^.]{0,60}?\\b(to|bcc|cc)\\b\\s*:?\\s*([\\w.+-]+@[\\w-]+\\.[\\w.-]+|https?://)"}
+# 拿敏感关键词去查询。
+- {id: sensitive-query, pattern: "(?i)\\b(keywords?|query|term|search(es)?)\\b[^.]{0,20}?['\"=]\\s*['\"]?[^'\"]{0,30}\\b(password|passwd|secret|confidential|credential|private\\s+key|api[_ ]key|token|ssn|sensitive\\s+data)"}
+# 宽松版 ignore-previous：允许中间夹一两个词（ignore your previous classification instructions）。
+- {id: ignore-instructions-broad, pattern: "(?i)\\b(ignore|disregard|forget)\\s+(all\\s+|any\\s+|your\\s+)*(previous|prior|above|earlier|original)\\s+(\\w+\\s+){0,2}(instructions?|prompts?|rules?|guidelines?)"}

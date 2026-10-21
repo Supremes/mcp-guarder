@@ -7,7 +7,7 @@
 
 - ``v0``：内置默认规则（``types.SPEC_STATIC_RULES``），不做修改。
 - 其他版本：读 ``eval/rules/<version>.yaml``（``{id, pattern}`` 列表）。
-- 测试集**每个规则版本只跑一次**：结果文件已存在就拒绝运行。改了规则就是新版本。
+- 留出集（``test``、``benign``）**每个规则版本只跑一次**：结果文件已存在就拒绝运行。改了规则就是新版本。
 
 结果写到 ``eval/results/<rules>-<split>.json``，只有统计和样本 ID，不含 MCPTox 原文。
 """
@@ -28,8 +28,9 @@ from typing import Any
 import yaml
 
 from eval.mcptox import fetch
-from eval.mcptox.load import LOADER_VERSION, Sample, load
-from eval.mcptox.split import SPLIT_PATH, select
+from eval.datasets import SPLITS, get_samples
+from eval.mcptox.load import LOADER_VERSION, Sample
+from eval.mcptox.split import SPLIT_PATH
 from mcp_guarder import config as config_mod
 from mcp_guarder import static_checks
 from mcp_guarder.types import StaticChecksConfig
@@ -37,6 +38,8 @@ from mcp_guarder.types import StaticChecksConfig
 EVAL_DIR = Path(__file__).resolve().parent
 RULES_DIR = EVAL_DIR / "rules"
 RESULTS_DIR = EVAL_DIR / "results"
+#: 留出集：规则冻结后每个版本只跑一次（test 测召回，benign 测真实误报）。
+HELD_OUT = ("test", "benign")
 
 
 def build_config(version: str) -> tuple[StaticChecksConfig, str]:
@@ -141,18 +144,17 @@ def git_commit() -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="eval.run_static")
     parser.add_argument("--rules", required=True, help="v0 或 eval/rules/ 下的版本名")
-    parser.add_argument("--split", required=True, choices=["dev", "test"])
+    parser.add_argument("--split", required=True, choices=SPLITS)
     args = parser.parse_args(argv)
 
     out_path = RESULTS_DIR / f"{args.rules}-{args.split}.json"
-    if args.split == "test" and out_path.exists():
-        print(f"{out_path.name} already exists: test split runs once per rules version",
+    if args.split in HELD_OUT and out_path.exists():
+        print(f"{out_path.name} already exists: {args.split} split runs once per rules version",
               file=sys.stderr)
         return 1
 
     cfg, rules_digest = build_config(args.rules)
-    ds = load()
-    samples = select(ds, args.split)
+    samples, source_meta = get_samples(args.split)
     result = evaluate(samples, cfg)
     result = {
         "meta": {
@@ -165,7 +167,7 @@ def main(argv: list[str] | None = None) -> int:
             "dataset_sha256": fetch.FILES,
             "loader_version": LOADER_VERSION,
             "code_commit": git_commit(),
-            "parse_errors": ds.parse_errors,
+            **source_meta,
             "run_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         },
         **result,
