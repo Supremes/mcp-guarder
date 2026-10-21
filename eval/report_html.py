@@ -144,7 +144,7 @@ def semantic_files() -> list[dict[str, Any]]:
 
 
 def build() -> str:
-    r = {f"{v}-{s}": load(f"{v}-{s}") for v in VERSIONS
+    r = {f"{v}-{s}": load(f"{v}-{s}") for v in (*VERSIONS, "v3")
          for s in ("dev", "test", "mcptox-all", "benign", "probes")}
     selfcheck = load("selfcheck-semantic")
     tests = load("test-summary")
@@ -184,14 +184,43 @@ def build() -> str:
         60,
     )
 
+    def dl(key: str, metric: str) -> dict[str, Any] | None:
+        data = r.get(key)
+        return data["deny_layer"][metric] if data and "deny_layer" in data else None
+
+    layer_chart = bar_chart(
+        "v3 分层：deny 层 vs 全部命中",
+        "规则与 v2 相同；deny 层 10 条命中即剥离，其余 21 条只告警、交给 LLM。GitHub 的 deny 层误报为非独立验证：分组时参考过它",
+        [
+            ("召回 · MCPTox 全量（拟合）", [
+                ("deny 层", 1, dl("v3-mcptox-all", "recall"), ""),
+                ("全部命中", 2, g("v3-mcptox-all", "recall"), ""),
+            ]),
+            ("召回 · 裁判注入样本", [
+                ("deny 层", 1, dl("v3-probes", "recall"), ""),
+                ("全部命中", 2, g("v3-probes", "recall"), ""),
+            ]),
+            ("误报 · GitHub 真实描述", [
+                ("deny 层", 1, dl("v3-benign", "false_positive_rate"), "非独立"),
+                ("全部命中", 2, g("v3-benign", "false_positive_rate"), ""),
+            ]),
+            ("误报 · 手写合法描述", [
+                ("deny 层", 1, dl("v3-probes", "false_positive_rate"), ""),
+                ("全部命中", 2, g("v3-probes", "false_positive_rate"), ""),
+            ]),
+        ],
+        [("deny 层（自动剥离）", 1), ("全部命中（含 warn）", 2)],
+        100,
+    )
+
     def tile(value: str, label: str, sub: str) -> str:
         return f'<div class="tile"><div class="big">{esc(value)}</div><div>{esc(label)}</div><small>{esc(sub)}</small></div>'
 
     tiles = "".join([
-        tile(pct(g("v2-mcptox-all", "recall")), "v2 · MCPTox 覆盖率", f"{frac(g('v2-mcptox-all', 'recall'))}，拟合口径"),
+        tile(pct(g("v2-mcptox-all", "recall")), "v2 / v3 · MCPTox 覆盖率", f"{frac(g('v2-mcptox-all', 'recall'))}，拟合口径"),
         tile(pct(g("v1-test", "recall")), "v1 · 测试集召回", f"{frac(g('v1-test', 'recall'))}，泛化参考"),
-        tile(pct(g("v2-benign", "false_positive_rate")), "v2 · GitHub 误报率",
-             f"{frac(g('v2-benign', 'false_positive_rate'))}，留出集"),
+        tile(pct(dl("v3-mcptox-all", "recall")), "v3 · deny 层自动剥离",
+             f"{frac(dl('v3-mcptox-all', 'recall'))}，其余交给 LLM"),
         tile(f"{tests['tests']}" if tests else "—", "测试用例全部通过",
              f"失败 {tests['failures']} · 错误 {tests['errors']}" if tests else ""),
     ])
@@ -205,11 +234,19 @@ def build() -> str:
         return (f"<tr><td>{esc(name)}</td><td>{frac(rc)}</td><td>{pct(rc)}</td><td>{ci(rc)}</td>"
                 f"<td>{frac(fp)} · {pct(fp)}</td><td>{ci(fp)}</td></tr>")
 
+    def deny_row(split: str) -> str:
+        d = r.get(f"v3-{split}")
+        if not d or "deny_layer" not in d:
+            return ""
+        rc, fp = d["deny_layer"]["recall"], d["deny_layer"]["false_positive_rate"]
+        return (f"<tr><td>v3 deny 层 / {esc(split)}</td><td>{frac(rc)}</td><td>{pct(rc)}</td><td>{ci(rc)}</td>"
+                f"<td>{frac(fp)} · {pct(fp)}</td><td>{ci(fp)}</td></tr>")
+
     table_rows = "".join(
         row(f"{v} / {split}", f"{v}-{split}")
         for v in VERSIONS for split in ("dev", "test", "mcptox-all", "benign", "probes")
         if r.get(f"{v}-{split}")
-    )
+    ) + "".join(deny_row(s) for s in ("dev", "mcptox-all", "benign", "probes"))
 
     if sem:
         sem_rows = "".join(
@@ -259,6 +296,7 @@ def build() -> str:
         tiles=tiles,
         recall_chart=recall_chart,
         fpr_chart=fpr_chart,
+        layer_chart=layer_chart,
         table_rows=table_rows,
         sem_block=sem_block,
         sc_rows=sc_rows,
@@ -350,12 +388,16 @@ ul {{ padding-left: 20px; }}
 <li><b>正则覆盖了 MCPTox 的已知写法，但这不等于泛化。</b>v2 用 MCPTox 全量编写，覆盖率只能当拟合指标；真正的泛化参考仍是 v1 在测试集上的 72%。</li>
 <li><b>真实描述上的误报开始出现。</b>GitHub 141 个真实工具上，v1 误报 2 条，v2 误报 3 条（2.1%），全部是合法的跨工具前置条件或参数说明，正则在句法上无法区分。</li>
 <li><b>LLM 语义检测已实现并完成无模型验证。</b>默认关闭，走 OpenAI 兼容接口，按定义摘要缓存，失败分两类处置；真实模型效果待你手动评测。</li>
-<li><b>建议组合：</b>v2 正则以 <code>warn</code> 模式做低成本初筛，LLM 语义检测负责剥离；正则命中但 LLM 判 benign 的条目进入人工 review。</li>
+<li><b>v3 分层落地：</b>同一套规则按精确度拆成 deny / warn 两层。deny 层 10 条在所有正常样本上 0 误报，但只能自动拦下 MCPTox 的 16.9%；其余 83% 的投毒只命中宽泛规则，要靠 LLM 判断，模型不可用时只会告警。</li>
 </ul>
 
 <h2>正则规则：召回与误报</h2>
 {recall_chart}
 {fpr_chart}
+
+<h2>v3：按精确度分层</h2>
+<p>同一套 31 条规则，按精确度拆成两层：10 条高精确度规则命中即剥离，不再调用 LLM；21 条宽泛规则只告警，由 LLM 判断意图。代价是：模型不可用时，自动剥离只剩 deny 层的覆盖。</p>
+{layer_chart}
 
 <h2>LLM 语义检测</h2>
 {sem_block}
