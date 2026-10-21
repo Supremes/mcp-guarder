@@ -139,7 +139,7 @@ flowchart LR
 | `server` | Server 身份与传输方式（v1 只支持 `stdio`） |
 | `defaults` | 异常或无规则命中时的兜底动作，见 [Fail-closed 行为](#fail-closed-行为) |
 | `inspect.fingerprint` | TOFU 指纹：`name/title/description/inputSchema` 参与 blake2b 摘要；首次出现记录，变化即 `deny_and_alert` |
-| `inspect.static_checks` | 扫描 `name/title/description/inputSchema/annotations`，命中则 `deny` 或 `warn` |
+| `inspect.static_checks` | 扫描 `name/title/description/inputSchema/annotations`，命中则 `deny` 或 `warn`；每条规则可单独设置 `on_hit` |
 | `policy` | 按顺序求值，第一条完整匹配的规则决定放行与否 |
 | `redact` | 出站扫 `params.arguments`，入站扫 `content[].text`、`content[].resource.text`、`structuredContent` |
 | `audit` | 审计路径、fsync 策略、payload 截断、日志与快照位置 |
@@ -192,7 +192,18 @@ policy:
 
 脱敏动作可选 `mask`（默认，替换为 `[REDACTED:{rule_id}]`）、`drop_field`、`deny_call`；`allowlist` 用于放过 `AKIAIOSFODNN7EXAMPLE` 这类示例值。
 
-内置静态规则主要覆盖标签、敏感路径这类显式特征。另有针对语义诱导的可选规则集 [`eval/rules/v2.yaml`](eval/rules/v2.yaml)（31 条），召回率更高，但在真实描述上存在误报，建议配合 `on_hit: warn` 使用，详见[检测效果评测](#检测效果评测)。
+内置静态规则主要覆盖标签、敏感路径这类显式特征。每条规则可以单独设置处置方式，不写就沿用整段的 `on_hit`：
+
+```yaml
+inspect:
+  static_checks:
+    on_hit: deny
+    rules:
+      - {id: hidden-instruction-tag, pattern: '(?is)<\s*(IMPORTANT|SYSTEM)\s*>', on_hit: deny}  # 高精确度：命中即剥离
+      - {id: must-call-tool, pattern: "(?i)\\byou\\s+must\\s+call\\b", on_hit: warn}          # 宽泛句式：只告警
+```
+
+只命中 `warn` 规则的 tool 会保留，命中记录写进 guard.log 和审计；开启 LLM 语义检测时，它照常送去判定。推荐的分层规则集见 [`eval/rules/v3.yaml`](eval/rules/v3.yaml)：31 条规则中 10 条高精确度规则 `deny`，21 条宽泛规则 `warn`，详见[检测效果评测](#检测效果评测)。
 
 ## Fail-closed 行为
 
@@ -275,12 +286,15 @@ HTTP/OAuth 相关风险（confused deputy、token passthrough、metadata SSRF）
 | 内置 7 条（v0） | 测试集 2/207 = 1.0% | 0/141 |
 | 结构规则 19 条（v1，只看开发集） | 测试集 149/207 = 72.0% | 2/141 = 1.4% |
 | 扩充规则 31 条（v2，用全量编写） | 全量 470/485 = 96.9%（拟合口径） | 3/141 = 2.1% |
+| v3 deny 层（v2 中 10 条高精确度规则） | 全量 82/485 = 16.9% | 0/141（非独立验证） |
 
 - 内置规则对语义投毒基本无效：样本里没有 `<IMPORTANT>` 这类标签，全是"使用 X 之前必须先调用 Y"式诱导。
 - v2 的 96.9% 是拟合覆盖率，不代表泛化；泛化参考是 v1 在测试集上的 72%。
 - 在真实描述上，误报来自合法的跨工具前置条件和参数说明，正则在句法上无法区分。
 
-结论：静态规则适合作为低成本、可解释的初筛（建议 `on_hit: warn`），区分意图交给可选的 LLM 语义检测；TOFU 指纹和默认拒绝的 policy 仍是主要防线。完整报告见 [docs/eval/detection-report-v2.md](docs/eval/detection-report-v2.md)（图表版 [HTML](docs/eval/detection-report-v2.html)）。
+v3 把同一套规则按精确度分层：10 条高精确度规则（`deny`）在所有正常样本上 0 误报，但只能自动拦下 MCPTox 的 16.9%；其余投毒只命中宽泛规则（`warn`），要靠 LLM 判断意图，模型不可用时只告警。
+
+结论：高精确度规则直接剥离，宽泛规则只做可解释的线索，区分意图交给可选的 LLM 语义检测；TOFU 指纹和默认拒绝的 policy 仍是主要防线。完整报告见 [docs/eval/detection-report-v2.md](docs/eval/detection-report-v2.md)（图表版 [HTML](docs/eval/detection-report-v2.html)）。
 
 ### LLM 语义检测（可选，默认关闭）
 
@@ -348,6 +362,7 @@ uv pip install -e '.[dev]'
 - [ ] 适配 MCP `2026-07-28` 无状态模型
 - [x] 静态检测离线评测（MCPTox + GitHub 真实描述）与规则迭代（v1 / v2），见 [评测报告](docs/eval/detection-report-v2.md)
 - [x] 可选的 LLM 语义投毒检测（OpenAI 兼容接口）
+- [x] 静态规则支持规则级 `on_hit`，v3 分层规则集
 - [ ] LLM 语义检测在本地模型上的真实评测
 - [ ] 多 Server 真实样本导出（`eval/corpus/export_benign.py`，需在隔离环境运行）
 - [ ] 会话级污点策略，应对 tool result 间接注入

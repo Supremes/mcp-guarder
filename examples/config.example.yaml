@@ -21,7 +21,7 @@ inspect:
     on_change: deny_and_alert         # 指纹变化时拒绝该 tool，并记录告警
   static_checks:
     enabled: true
-    on_hit: deny                      # 命中规则后可选择 deny 或 warn
+    on_hit: deny                      # 命中规则后可选择 deny 或 warn；单条规则可写 on_hit 覆盖（见 eval/rules/v3.yaml）
     scan_fields: [name, title, description, inputSchema, annotations]
     rules:
       - {id: hidden-instruction-tag, pattern: '(?is)<\s*(IMPORTANT|SYSTEM|SECRET|INSTRUCTIONS)\s*>'}
