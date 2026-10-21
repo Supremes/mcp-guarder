@@ -1,0 +1,65 @@
+{
+  "rules": "v2",
+  "passed": true,
+  "checks": [
+    {
+      "check": "oracle-dev",
+      "passed": true,
+      "runner": [
+        271,
+        278,
+        0,
+        230
+      ],
+      "regex": [
+        271,
+        278,
+        0,
+        230
+      ]
+    },
+    {
+      "check": "oracle-benign",
+      "passed": true,
+      "runner": [
+        0,
+        0,
+        3,
+        141
+      ],
+      "regex": [
+        0,
+        0,
+        3,
+        141
+      ]
+    },
+    {
+      "check": "oracle-probes",
+      "passed": true,
+      "runner": [
+        7,
+        8,
+        10,
+        30
+      ],
+      "regex": [
+        7,
+        8,
+        10,
+        30
+      ]
+    },
+    {
+      "check": "invalid-output-accounting",
+      "passed": true,
+      "invalid": 180,
+      "judged": 328,
+      "samples": 508,
+      "deployed_recall": [
+        272,
+        278
+      ]
+    }
+  ]
+}

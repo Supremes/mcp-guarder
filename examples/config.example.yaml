@@ -31,6 +31,18 @@ inspect:
       - {id: base64-blob,       pattern: '[A-Za-z0-9+/]{200,}={0,2}'}
       - {id: ansi-escape,       pattern: '\x1b\[[0-9;]*[A-Za-z]'}
       - {id: cross-server-ref,  pattern: '(?i)\bmcp__[a-z0-9_]+__'}   # 描述引用其他 Server 时，提示 shadowing 风险
+  semantic:                           # LLM 语义投毒检测，默认关闭
+    enabled: false
+    base_url: http://localhost:11434/v1   # 任意 OpenAI 兼容的 Chat Completions 端点（Ollama / vLLM / LM Studio）
+    model: qwen3:8b
+    # api_key_env: MODEL_API_KEY      # 只写环境变量名；key 本身不允许出现在配置里
+    timeout_s: 20                     # 一次 tools/list 的总时间预算，要小于客户端的 MCP 超时
+    max_tools_per_request: 16
+    response_format: json_schema      # json_schema | json_object | none，按模型服务的支持程度选
+    on_hit: deny                      # 判为投毒：deny 剥离 / warn 只告警
+    on_unavailable: warn              # 超时、连不上：默认放行并告警，结果不缓存
+    on_invalid_output: deny           # 输出不合法（可能被注入带歪）：默认剥离
+    cache: ~/.mcp-guarder/semantic_cache.sqlite   # 按 tool 定义摘要缓存判定，定义不变不重复调用
 
 # ── 2. 控制 tool 调用权限 ──
 policy:

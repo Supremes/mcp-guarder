@@ -19,7 +19,7 @@ from typing import Any
 
 from eval.datasets import get_samples
 from eval.run_semantic import run, summarize
-from eval.run_static import build_config, evaluate
+from eval.run_static import RESULTS_DIR, build_config, evaluate
 from mcp_guarder import static_checks
 from mcp_guarder.types import SemanticConfig
 
@@ -79,12 +79,18 @@ def check(split: str, *, garbage_every: int = 0) -> dict[str, Any]:
 
 def main() -> int:
     ok = True
+    rows: list[dict[str, Any]] = []
     for split in ("dev", "benign", "probes"):
         out = check(split)
         got, exp = out["result"], out["expected"]
         same = all(got[k]["k"] == exp[k]["k"] and got[k]["n"] == exp[k]["n"]
                    for k in ("recall", "false_positive_rate"))
         ok &= same and not got["scan_errors"]
+        rows.append({"check": f"oracle-{split}", "passed": same,
+                     "runner": [got["recall"]["k"], got["recall"]["n"],
+                                got["false_positive_rate"]["k"], got["false_positive_rate"]["n"]],
+                     "regex": [exp["recall"]["k"], exp["recall"]["n"],
+                               exp["false_positive_rate"]["k"], exp["false_positive_rate"]["n"]]})
         print(f"[{'PASS' if same else 'FAIL'}] {split}: semantic-runner recall "
               f"{got['recall']['k']}/{got['recall']['n']} FPR {got['false_positive_rate']['k']}/"
               f"{got['false_positive_rate']['n']}  vs regex {exp['recall']['k']}/{exp['recall']['n']} "
@@ -99,6 +105,13 @@ def main() -> int:
     print(f"[{'PASS' if consistent else 'FAIL'}] invalid outputs counted separately: "
           f"{errors} invalid + {judged} judged = {total} samples; deployed recall "
           f"{out['deployed_view']['recall']['k']}/{out['deployed_view']['recall']['n']}")
+    rows.append({"check": "invalid-output-accounting", "passed": consistent,
+                 "invalid": errors, "judged": judged, "samples": total,
+                 "deployed_recall": [out["deployed_view"]["recall"]["k"],
+                                     out["deployed_view"]["recall"]["n"]]})
+    (RESULTS_DIR / "selfcheck-semantic.json").write_text(
+        json.dumps({"rules": RULES, "passed": ok, "checks": rows}, indent=2) + "\n"
+    )
     print("SELF-CHECK", "PASSED" if ok else "FAILED")
     return 0 if ok else 1
 
