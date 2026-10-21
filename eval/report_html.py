@@ -250,17 +250,29 @@ def build() -> str:
 
     if sem:
         sem_rows = "".join(
-            f"<tr><td>{esc(d['meta']['tag'])}</td><td>{esc(d['meta']['split'])}</td>"
-            f"<td>{frac(d['recall'])} · {pct(d['recall'])}</td>"
-            f"<td>{frac(d['false_positive_rate'])} · {pct(d['false_positive_rate'])}</td>"
-            f"<td>{esc(json.dumps(d.get('errors_by_kind', {}), ensure_ascii=False))}</td>"
-            f"<td>{frac(d['deployed_view']['recall'])}</td><td>{esc(d['meta']['elapsed_s'])}s</td></tr>"
+            (
+                f"<tr><td>{esc(d['meta']['tag'])}</td><td>{esc(d['meta']['split'])}</td>"
+                f"<td colspan=5>结果无效：{esc(d['validation']['reason'])}；保留原始记录，不计入结论。</td></tr>"
+                if not d.get("validation", {}).get("valid", True) else
+                f"<tr><td>{esc(d['meta']['tag'])}</td><td>{esc(d['meta']['split'])}</td>"
+                f"<td>{frac(d['recall'])} · {pct(d['recall'])}<br><small>{ci(d['recall'])}</small></td>"
+                f"<td>{frac(d['false_positive_rate'])} · {pct(d['false_positive_rate'])}"
+                f"<br><small>{ci(d['false_positive_rate'])}</small></td>"
+                f"<td>{esc(json.dumps(d.get('errors_by_kind', {}), ensure_ascii=False))}</td>"
+                f"<td>{frac(d['deployed_view']['recall'])} / "
+                f"{frac(d['deployed_view']['false_positive_rate'])}</td>"
+                f"<td>{esc(d['meta']['elapsed_s'])}s</td></tr>"
+            )
             for d in sem
         )
         sem_block = (
             "<table><thead><tr><th>模型</th><th>样本集</th><th>召回</th><th>误报</th>"
-            "<th>失败</th><th>部署口径召回</th><th>用时</th></tr></thead>"
+            "<th>失败</th><th>部署口径检出 / 误报</th><th>用时</th></tr></thead>"
             f"<tbody>{sem_rows}</tbody></table>"
+            "<p>召回和误报附 Wilson 95% CI；失败不进入分类指标分母，但保留在部署口径中。"
+            "这是独立 LLM 分类器的离线结果，不等于 v3 + LLM 组合网关或 Agent 行为评测。"
+            "GitHub 同名工具的 schema 变体按快照区分，不代表同样数量的独立工具。"
+            "模型设置、批次延迟与运行过程见<a href=\"detection-report-v2.md\">文字报告</a>。</p>"
         )
     else:
         sem_block = (
@@ -299,6 +311,13 @@ def build() -> str:
         layer_chart=layer_chart,
         table_rows=table_rows,
         sem_block=sem_block,
+        sem_conclusion=(
+            "<b>已记录本地模型实测结果。</b>召回、误报、失败与耗时见下表；"
+            "默认仍关闭，不把离线分类结果当成实际 Agent 防护收益。"
+            if sem else
+            "<b>LLM 语义检测已实现并完成无模型验证。</b>默认关闭，走 OpenAI 兼容接口，"
+            "按定义摘要缓存，失败分两类处置；真实模型效果待手动评测。"
+        ),
         sc_rows=sc_rows,
         test_rows=test_rows,
     )
@@ -387,7 +406,7 @@ ul {{ padding-left: 20px; }}
 <ul>
 <li><b>正则覆盖了 MCPTox 的已知写法，但这不等于泛化。</b>v2 用 MCPTox 全量编写，覆盖率只能当拟合指标；真正的泛化参考仍是 v1 在测试集上的 72%。</li>
 <li><b>真实描述上的误报开始出现。</b>GitHub 141 个真实工具上，v1 误报 2 条，v2 误报 3 条（2.1%），全部是合法的跨工具前置条件或参数说明，正则在句法上无法区分。</li>
-<li><b>LLM 语义检测已实现并完成无模型验证。</b>默认关闭，走 OpenAI 兼容接口，按定义摘要缓存，失败分两类处置；真实模型效果待你手动评测。</li>
+<li>{sem_conclusion}</li>
 <li><b>v3 分层落地：</b>同一套规则按精确度拆成 deny / warn 两层。deny 层 10 条在所有正常样本上 0 误报，但只能自动拦下 MCPTox 的 16.9%；其余 83% 的投毒只命中宽泛规则，要靠 LLM 判断，模型不可用时只会告警。</li>
 </ul>
 

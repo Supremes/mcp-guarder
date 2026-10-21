@@ -2,7 +2,7 @@
 
 - 日期：2026-10-16
 - 分支：`feat/detection-eval`
-- 状态：A 已完成（2026-10-19）；A2 代码与无模型验证已完成（2026-10-21），LLM 真实评测待手动触发，见 [评测报告 v2](eval/detection-report-v2.md)；B 待启动
+- 状态：A 已完成（2026-10-19）；A2 代码、无模型验证与本地 LLM 真实评测已完成（2026-10-21），见 [评测报告 v2](eval/detection-report-v2.md)；多 Server 样本导出与 B 待启动
 - 取代：`docs/agent-execution-eval-spec.md`（已删除，评测口径并入 §7）
 
 ## 1. 为什么做
@@ -198,7 +198,7 @@ A 合计 7–12 小时。每个批次结束时汇报改动、跑过的验证、�
 - 基于 MCPTox 全量扩充正则（v2）。v2 在 MCPTox 上只能报告"拟合覆盖率"，不叫检测率。
 - 新增真实正常样本留出集：github-mcp-server 的 141 个工具定义快照（只读取数据，不执行代码）。v2 冻结后只跑一次。
 - 引入 LLM 语义检测：OpenAI 兼容 Chat Completions 接口，不做 Claude 专门适配；默认关闭。
-- 评测使用本地模型，由用户手动触发；开发环境里没有模型，只做无模型验证。
+- 评测使用本地模型，由用户显式触发；初期只做无模型验证，2026-10-21 已按用户要求使用 oMLX / Qwen3.5-9B-MLX-4bit 完成真实评测。
 - 本轮继续在 `feat/detection-eval` 分支上进行；result 污点策略（B）单独立 spec，不合并。
 
 ### 12.2 口径
@@ -215,7 +215,7 @@ A 合计 7–12 小时。每个批次结束时汇报改动、跑过的验证、�
 | 正则 v2 | 基于 MCPTox 全量和手写探测集编写；GitHub 留出集只跑一次；误报原文逐条分析 | ✅ 覆盖 470/485，GitHub 误报 3/141 |
 | 语义检测器 | 配置严格校验；nonce 隔离；输出严格解析；缓存；时间预算；两类失败分开处置；代理集成 | ✅ 51 个单元测试 + 端到端测试 |
 | 评测链路 | 不依赖真实模型即可证明 runner 正确 | ✅ 假模型复现正则数字，自检通过 |
-| 真实模型评测 | 开发集调 prompt，冻结后留出集各跑一次 | ⏸ 待用户手动触发 |
+| 真实模型评测 | 开发集检查 prompt，冻结后留出集各跑一次 | ✅ 沿用 semantic-v1，test 检出 195/207、误报 3/132；GitHub 误报 0/141；probes 检出 8/8、误报 0/30；四个完整集合无请求或解析错误 |
 | 报告 | Markdown + HTML，HTML 能在补充 LLM 结果后重新生成 | ✅ |
 | 多 Server 正常样本 | 导出脚本 | ⏸ 已写好，会执行第三方代码，需要在隔离环境里手动运行 |
 | 规则级 `on_hit` | 配置严格校验；代理按规则分流；只命中 warn 的 tool 照常送 LLM；模型不可用时附带 warn 命中作为线索 | ✅ 11 个单元测试 |
@@ -225,3 +225,12 @@ A 合计 7–12 小时。每个批次结束时汇报改动、跑过的验证、�
 
 - deny 层只能自动拦下 MCPTox 的 16.9%，其余依赖 LLM；模型不可用时，按默认 `on_unavailable: warn` 只告警。
 - 分组参考过 v2 在 GitHub 留出集上的误报分析，v3 的误报率需要在新的留出数据上验证（例如导出脚本跑出的多 Server 样本）。
+
+### 12.5 本地模型评测交付（2026-10-21）
+
+- oMLX API 0.4.4，`Qwen3.5-9B-MLX-4bit`，已有配置关闭 thinking；`semantic-v1` 未修改。每批最多 8 个工具、JSON Schema、temperature 0、单批预算 120 秒；test 一次，benign 的有效身份版本一次（原身份版本已作废，见下项）。
+- 有效 dev / test / benign / probes 共 1,026 条、148 批；dev / test / probes 结果在 `eval/results/semantic-omlx-qwen3.5-9b-4bit-semantic-v1-*.json`，有效 benign 在 `eval/results/semantic-omlx-qwen3.5-9b-4bit-idv2-semantic-v1-benign.json`。两个对应的 `*-run.json` 保存冻结配置、数据版本及中断 / 作废记录。
+- 最终对账发现 GitHub 的 141 份快照只有 131 个工具名，按工具名作样本 ID 会覆盖 10 条判定。改为快照文件名作 ID，runner 在调用模型前拒绝重复 ID；旧 benign 结果追加无效标记但保留原指标，以新身份版本 `-idv2` 补跑一次。未改原文、切分、模型、prompt 或推理参数，不能把两个版本混报。
+- 首轮开发集因 HTTP 断流中断，未产出完整指标；修复传输层将 `HTTPException` 归为 `unavailable` 后重跑开发集。留出集不重跑，失败不改记为安全。
+- 真实 CLI 联调验证 v3 warn 规则交给 LLM、投毒工具剥离、审计，以及服务不可达时的缓存复用；见 `eval/results/omlx-qwen3.5-9b-4bit-proxy-smoke.json`。未新增单元测试；已有 62 个相关测试与评测链路自检通过。
+- 这是 LLM 分类器的离线效果，不是 v3 + LLM 组合的大规模效果，也不是 B 的 Agent 成对实验。批次 P50 / P95 为 10.28 / 13.88 秒，不能把评测的每批预算误当成运行时整个 `tools/list` 的预算；保持默认关闭。

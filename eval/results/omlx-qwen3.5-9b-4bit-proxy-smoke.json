@@ -1,0 +1,32 @@
+{
+  "run_at": "2026-10-21T15:56:24+00:00",
+  "passed": true,
+  "model": "Qwen3.5-9B-MLX-4bit",
+  "static_rules": "v3",
+  "static_warn_rules": [
+    "before-clause-tool-call",
+    "before-trigger-tool",
+    "cross-tool-precondition"
+  ],
+  "first_session": {
+    "returned_tools": [
+      "echo"
+    ],
+    "elapsed_s": 3.627
+  },
+  "second_session_unreachable_endpoint": {
+    "returned_tools": [
+      "echo"
+    ],
+    "elapsed_s": 0.09
+  },
+  "cached_verdicts": [
+    "benign",
+    "malicious"
+  ],
+  "audit_decision_by": [
+    "semantic",
+    "semantic"
+  ],
+  "note": "Self-authored definitions only; no tool actions executed. Temporary config uses on_unavailable=deny to prove offline cache reuse."
+}

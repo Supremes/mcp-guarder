@@ -267,7 +267,7 @@ mcp-guarder audit grep <pattern> [--server S]        # 正则搜索审计记录
 
 | 风险 | 应对 | 局限 |
 |---|---|---|
-| Tool poisoning / line jumping | 静态规则扫描 tool 定义，命中即移除；可选 LLM 语义检测 | 内置规则对语义诱导基本无效（MCPTox 测试集召回 1%，见[检测效果评测](#检测效果评测)）；正则会误判合法写法；LLM 检测效果待评测 |
+| Tool poisoning / line jumping | 静态规则扫描 tool 定义，命中即移除；可选 LLM 语义检测 | 内置规则对语义诱导基本无效（MCPTox 测试集召回 1%，见[检测效果评测](#检测效果评测)）；本地 LLM 测试集召回 94.2%，仍有漏报和误报 |
 | Rug pull | TOFU 指纹，受保护字段变化即拒绝 | 首次出现就带毒时 TOFU 无效，只能靠静态规则补 |
 | Cross-server shadowing | 恶意 Server 的描述被静态规则检查；可信 Server 的越权调用由它自己的 policy 拦截 | 每个 Server 都要单独接入才受保护 |
 | Tool result 间接注入 | 对结果做 secret 脱敏 | v1 只脱敏，不识别结果中的注入指令 |
@@ -279,7 +279,7 @@ HTTP/OAuth 相关风险（confused deputy、token passthrough、metadata SSRF）
 
 ## 检测效果评测
 
-用 [MCPTox](https://github.com/zhiqiangwang4/MCPTox-Benchmark)（485 条投毒 + 362 条正常 tool 描述，45 个真实 Server）和 github-mcp-server 的 141 个真实工具定义，离线评测静态规则。按 Server 固定切分开发集和测试集；GitHub 快照作为留出集，每个规则版本只跑一次：
+用 [MCPTox](https://github.com/zhiqiangwang4/MCPTox-Benchmark)（485 条投毒 + 362 条正常 tool 描述，45 个真实 Server）和 github-mcp-server 的 141 份工具定义快照，离线评测静态规则。GitHub 快照包含 131 个工具名及其 schema 变体，不是 141 个独立工具。按 Server 固定切分开发集和测试集；GitHub 快照作为留出集，每个规则版本只跑一次：
 
 | 规则 | MCPTox 召回 | GitHub 真实描述误报 |
 |---|---|---|
@@ -287,6 +287,7 @@ HTTP/OAuth 相关风险（confused deputy、token passthrough、metadata SSRF）
 | 结构规则 19 条（v1，只看开发集） | 测试集 149/207 = 72.0% | 2/141 = 1.4% |
 | 扩充规则 31 条（v2，用全量编写） | 全量 470/485 = 96.9%（拟合口径） | 3/141 = 2.1% |
 | v3 deny 层（v2 中 10 条高精确度规则） | 全量 82/485 = 16.9% | 0/141（非独立验证） |
+| 本地 Qwen3.5-9B-MLX-4bit（semantic-v1） | 测试集 195/207 = 94.2% | 0/141（95% CI 上界 2.65%） |
 
 - 内置规则对语义投毒基本无效：样本里没有 `<IMPORTANT>` 这类标签，全是"使用 X 之前必须先调用 Y"式诱导。
 - v2 的 96.9% 是拟合覆盖率，不代表泛化；泛化参考是 v1 在测试集上的 72%。
@@ -305,7 +306,9 @@ v3 把同一套规则按精确度分层：10 条高精确度规则（`deny`）�
 - **防裁判被注入**：待测定义包在随机 nonce 标签里，输出强制为固定 JSON 并严格校验，请求不带任何工具和 secret；正则独立运行，LLM 判 benign 也撤销不了正则命中。
 - API key 只从环境变量读取（`api_key_env`），配置里不允许出现 key 本身。
 
-配置示例见 [`examples/config.example.yaml`](examples/config.example.yaml)。真实模型上的效果尚未评测，评测命令见报告末尾。
+已用 oMLX 0.4.4 部署的 `Qwen3.5-9B-MLX-4bit`（非思考模式）完成真实评测：MCPTox 测试集召回 **195/207 = 94.2%**，正常描述误报 **3/132 = 2.3%**；GitHub 留出集误报 **0/141**；手写裁判注入检出 **8/8**，合法探测误报 **0/30**。四个完整集合共 1,026 条，无请求或解析错误；不代表真实误报率为零，也不等于 Agent 行为防护收益。
+
+每批最多 8 个工具时，148 批的 P50 / P95 为 **10.28 / 13.88 秒**（M5 Pro，24 GiB，含服务缓存影响）。评测预算是每批 120 秒，运行时 `timeout_s` 则覆盖整个 `tools/list`；默认 20 秒不适合直接照搬到大工具集的首次扫描。真实 CLI 联调已验证 v3 warn 命中交给 LLM 剥离，以及后续会话的缓存复用。GitHub 首轮结果因样本 ID 碰撞作废，修正身份后以 `-idv2` 标签补跑，原记录保留；没有调整模型或 prompt。配置示例见 [`examples/config.example.yaml`](examples/config.example.yaml)，环境、局限与复现命令见[报告](docs/eval/detection-report-v2.md#本地-llm-评测配置2026-10-21)。
 
 ## 非目标
 
@@ -363,7 +366,7 @@ uv pip install -e '.[dev]'
 - [x] 静态检测离线评测（MCPTox + GitHub 真实描述）与规则迭代（v1 / v2），见 [评测报告](docs/eval/detection-report-v2.md)
 - [x] 可选的 LLM 语义投毒检测（OpenAI 兼容接口）
 - [x] 静态规则支持规则级 `on_hit`，v3 分层规则集
-- [ ] LLM 语义检测在本地模型上的真实评测
+- [x] LLM 语义检测在本地模型上的真实评测（oMLX / Qwen3.5-9B-MLX-4bit，semantic-v1）
 - [ ] 多 Server 真实样本导出（`eval/corpus/export_benign.py`，需在隔离环境运行）
 - [ ] 会话级污点策略，应对 tool result 间接注入
 

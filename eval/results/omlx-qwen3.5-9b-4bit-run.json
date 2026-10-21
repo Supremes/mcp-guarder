@@ -1,0 +1,78 @@
+{
+  "tag": "omlx-qwen3.5-9b-4bit",
+  "frozen_at": "2026-10-21T15:43:21+00:00",
+  "status": "completed",
+  "model": "Qwen3.5-9B-MLX-4bit",
+  "server": {
+    "name": "oMLX",
+    "version": "0.4.4",
+    "base_url": "http://127.0.0.1:8000/v1"
+  },
+  "machine": {
+    "chip": "Apple M5 Pro",
+    "memory_gib": 24,
+    "macos": "26.6",
+    "python": "3.12.13"
+  },
+  "inference": {
+    "temperature": 0,
+    "response_format": "json_schema",
+    "batch_size": 8,
+    "timeout_s": 120,
+    "enable_thinking": false,
+    "force_sampling": false,
+    "server_sampling_defaults": {
+      "top_p": 0.95,
+      "top_k": 0,
+      "repetition_penalty": 1.0,
+      "max_tokens": 32768
+    }
+  },
+  "prompt_version": "semantic-v1",
+  "frozen_hashes": {
+    "runner_sha256": "0be3eed9d0e034a89d27eab517a0e622df19b826bcdfca1711896da8b1bb2966",
+    "detector_sha256": "2508502c698be51df4f244192280b2adaf81516bc4153dbb5ae03b190852e197",
+    "prompt_sha256": "d96b0dbdce46a11e285a2331357dac65cb964176a887e4224e51e551d8ff6ad8"
+  },
+  "data_sources": {
+    "mcptox_commit": "f85189f9ad12504c197c7f920ab818a40657b1fa",
+    "mcptox_files_sha256": {
+      "pure_tool.json": "54b1eb0e9d7b2f18465266aa9d9dfda828cd558b1269b74731ec2c5d8579e617",
+      "response_all.json": "79a90049be931c59e71446d6180b1d7f0d196d123d08a59bc155d142b5041c03"
+    },
+    "github_commit": "e3809fe91c7546633241006bf0b91f23b2595e28",
+    "github_manifest_sha256": "17ae23a83bf033ed32c2916969a98e6d196333ed582efbe9fcb774d045622d5f",
+    "split_sha256": "d0bca28ceb316ab568bb4689d723ab8b25bbb77aa34d74888e0cdad7dcd899df"
+  },
+  "completed_splits": [
+    "dev",
+    "test",
+    "benign",
+    "probes"
+  ],
+  "prior_attempts": [
+    {
+      "split": "dev",
+      "status": "aborted",
+      "completed_batches": 62,
+      "planned_batches": 76,
+      "failed_batch": 63,
+      "error": "http.client.IncompleteRead(1 bytes read)",
+      "metrics": null,
+      "note": "No result file was produced. HTTP transport classification was fixed before repeating development; held-out splits had not been run."
+    }
+  ],
+  "completed_at": "2026-10-21T15:55:30+00:00",
+  "post_run_validation": {
+    "invalidated_results": {
+      "semantic-omlx-qwen3.5-9b-4bit-semantic-v1-benign.json": {
+        "valid": false,
+        "reason": "10 duplicate tool-name sample IDs overwrote earlier verdicts; 141 snapshots but only 131 retained verdicts",
+        "original_file_sha256": "f4b07f8ed06ddc99b0477fd07a7d641dede66706429a1796bee0bb50b3cdedbf",
+        "replacement": "semantic-omlx-qwen3.5-9b-4bit-idv2-semantic-v1-benign.json",
+        "note": "Original metrics and verdicts retained unchanged for traceability; do not use their 141-sample denominator."
+      }
+    },
+    "correction_tag": "omlx-qwen3.5-9b-4bit-idv2"
+  }
+}

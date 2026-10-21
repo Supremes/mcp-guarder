@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import hashlib
+import http.client
 import json
 import os
 import re
@@ -277,7 +278,7 @@ def urllib_transport(url: str, headers: Mapping[str, str], body: JsonObj, timeou
     except urllib.error.HTTPError as exc:
         snippet = exc.read(300).decode("utf-8", "replace") if exc.fp else ""
         raise SemanticFailure(FailureKind.UNAVAILABLE, f"HTTP {exc.code}: {snippet}") from exc
-    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+    except (urllib.error.URLError, TimeoutError, OSError, http.client.HTTPException) as exc:
         raise SemanticFailure(FailureKind.UNAVAILABLE, f"request failed: {exc}") from exc
     try:
         data = json.loads(raw)

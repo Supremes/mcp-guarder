@@ -69,7 +69,8 @@ def load_tools() -> list[dict]:
     items = []
     for path in sorted(cache.glob("*.snap")):
         tool = json.loads(path.read_text(encoding="utf-8"))
-        items.append({"id": f"github:{tool.get('name', path.stem)}", "server": "github", "tool": tool})
+        # 同名工具有不同 schema 的快照，样本身份必须按文件区分。
+        items.append({"id": f"github:{path.stem}", "server": "github", "tool": tool})
     return items
 
 

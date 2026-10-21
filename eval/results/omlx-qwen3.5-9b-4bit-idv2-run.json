@@ -1,0 +1,53 @@
+{
+  "model": "Qwen3.5-9B-MLX-4bit",
+  "server": {
+    "name": "oMLX",
+    "version": "0.4.4",
+    "base_url": "http://127.0.0.1:8000/v1"
+  },
+  "machine": {
+    "chip": "Apple M5 Pro",
+    "memory_gib": 24,
+    "macos": "26.6",
+    "python": "3.12.13"
+  },
+  "inference": {
+    "temperature": 0,
+    "response_format": "json_schema",
+    "batch_size": 8,
+    "timeout_s": 120,
+    "enable_thinking": false,
+    "force_sampling": false,
+    "server_sampling_defaults": {
+      "top_p": 0.95,
+      "top_k": 0,
+      "repetition_penalty": 1.0,
+      "max_tokens": 32768
+    }
+  },
+  "prompt_version": "semantic-v1",
+  "data_sources": {
+    "mcptox_commit": "f85189f9ad12504c197c7f920ab818a40657b1fa",
+    "mcptox_files_sha256": {
+      "pure_tool.json": "54b1eb0e9d7b2f18465266aa9d9dfda828cd558b1269b74731ec2c5d8579e617",
+      "response_all.json": "79a90049be931c59e71446d6180b1d7f0d196d123d08a59bc155d142b5041c03"
+    },
+    "github_commit": "e3809fe91c7546633241006bf0b91f23b2595e28",
+    "github_manifest_sha256": "17ae23a83bf033ed32c2916969a98e6d196333ed582efbe9fcb774d045622d5f",
+    "split_sha256": "d0bca28ceb316ab568bb4689d723ab8b25bbb77aa34d74888e0cdad7dcd899df"
+  },
+  "tag": "omlx-qwen3.5-9b-4bit-idv2",
+  "status": "completed",
+  "frozen_at": "2026-10-21T16:01:31+00:00",
+  "sample_identity_version": 2,
+  "identity": "github:<snapshot filename stem>, not tool name",
+  "corrects_result": "semantic-omlx-qwen3.5-9b-4bit-semantic-v1-benign.json",
+  "note": "One corrective run for an accounting bug. Raw data, split, prompt, model and inference parameters unchanged; no tuning using held-out outputs.",
+  "frozen_hashes": {
+    "runner_sha256": "ef33f8c52d5d4a4c279fee34a1710782f4986d4c8d2dd3d042f54148656e99ec",
+    "detector_sha256": "2508502c698be51df4f244192280b2adaf81516bc4153dbb5ae03b190852e197",
+    "prompt_sha256": "d96b0dbdce46a11e285a2331357dac65cb964176a887e4224e51e551d8ff6ad8",
+    "github_loader_sha256": "55dd7dbfb8c2fc6fd89d2b2b558720b852aa540e6c992b43629d1eb467f86eff"
+  },
+  "completed_at": "2026-10-21T16:04:47+00:00"
+}

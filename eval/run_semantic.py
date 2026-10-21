@@ -1,4 +1,4 @@
-"""用 LLM 语义检测器跑评测（OpenAI 兼容接口）。**需要手动触发**，开发环境里没有模型。
+"""用 LLM 语义检测器跑评测（OpenAI 兼容接口），需要显式指定本地模型端点。
 
 用法::
 
@@ -34,6 +34,7 @@ import random
 import sys
 import time
 from collections import defaultdict
+from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -74,10 +75,13 @@ def run(
     progress: bool = True,
 ) -> dict[str, Any]:
     """逐批调用检测器，返回 (hits, errors, verdict 明细, 用时)。"""
+    if len({s.id for s in samples}) != len(samples):
+        raise ValueError("duplicate sample IDs would overwrite verdicts; fix dataset identities first")
     judge = sem.SemanticJudge(config, transport=transport)
     hits: dict[str, list[str]] = {}
     errors: list[dict[str, str]] = []
     details: dict[str, dict[str, Any]] = {}
+    batch_details: list[dict[str, Any]] = []
     plan = plan_batches(samples, config.max_tools_per_request)
     started = time.monotonic()
     for i, (server, siblings, batch) in enumerate(plan, 1):
@@ -88,7 +92,15 @@ def run(
             if [str(b.tool.get("name")) for b in batch].count(str(t.get("name"))) > 1:
                 t["name"] = f"{t.get('name')}#{j}"
             tools.append(t)
+        batch_started = time.monotonic()
         report = judge.judge(tools, server=server, sibling_names=siblings)
+        batch_details.append({
+            "server": server,
+            "sample_ids": [s.id for s in batch],
+            "elapsed_s": round(time.monotonic() - batch_started, 3),
+            "model_calls": report.model_calls,
+            "failure_details": list(report.failure_details),
+        })
         for s, t in zip(batch, tools):
             name = str(t.get("name"))
             verdict = report.verdict_for(name)
@@ -101,9 +113,10 @@ def run(
                 errors.append({"id": s.id, "error": str(kind)})
         if progress:
             print(f"  batch {i}/{len(plan)} {server}: {len(batch)} tools, "
-                  f"errors so far {len(errors)}", file=sys.stderr)
+                  f"{batch_details[-1]['elapsed_s']}s, errors so far {len(errors)}", file=sys.stderr)
     return {"hits": hits, "errors": errors, "details": details,
-            "elapsed_s": round(time.monotonic() - started, 1), "batches": len(plan)}
+            "elapsed_s": round(time.monotonic() - started, 1), "batches": len(plan),
+            "batch_details": batch_details}
 
 
 def summarize(samples: list[Sample], outcome: dict[str, Any]) -> dict[str, Any]:
@@ -125,6 +138,7 @@ def summarize(samples: list[Sample], outcome: dict[str, Any]) -> dict[str, Any]:
         "false_positive_rate": deployed("clean"),
     }
     result["verdict_details"] = outcome["details"]
+    result["batch_details"] = outcome["batch_details"]
     return result
 
 
@@ -177,10 +191,19 @@ def main(argv: list[str] | None = None) -> int:
             "prompt_sha256": hashlib.sha256(sem.SYSTEM_PROMPT.encode()).hexdigest(),
             "response_format": args.response_format,
             "batch_size": args.batch_size,
+            "timeout_s": args.timeout_s,
+            "temperature": 0,
+            "shuffle_seed": SEED,
             "split": args.split,
             "limit": args.limit,
             "loader_version": LOADER_VERSION,
             "code_commit": git_commit(),
+            "runner_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            "detector_sha256": hashlib.sha256(Path(sem.__file__).read_bytes()).hexdigest(),
+            "samples_sha256": hashlib.sha256(json.dumps(
+                [asdict(s) for s in samples], sort_keys=True, ensure_ascii=False,
+                separators=(",", ":"),
+            ).encode()).hexdigest(),
             "elapsed_s": outcome["elapsed_s"],
             "batches": outcome["batches"],
             "run_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
