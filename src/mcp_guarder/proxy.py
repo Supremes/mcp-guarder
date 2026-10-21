@@ -1043,18 +1043,31 @@ class Proxy:
             for hit in sc_report.hits:
                 # excerpt 已经过 visible_escape：ANSI 存成字面量 ``\x1b[``，
                 # 免得 cat guard.log 的时候终端被二次攻击（SPEC §7 M3-3）。
+                action = self._config.inspect.static_checks.action_for(hit.rule_id)
                 self._log.warn(
                     f"static_checks hit {self._server_name}/{hit.tool} "
-                    f"{hit.field_path} {hit.rule_id}: {hit.excerpt}"
+                    f"{hit.field_path} {hit.rule_id} ({action}): {hit.excerpt}"
                 )
         except DetectorError as exc:
             return self._deny_whole_tools_list(message, tools, exc, detectors, rpc_id, latency)
 
         drop: list[str] = list(fp_report.changed_tools)
-        static_dropped: list[str] = []
-        if self._config.inspect.static_checks.on_hit is StaticCheckAction.DENY:
-            static_dropped = [t for t in sc_report.hit_tools if t not in set(drop)]
-            drop.extend(static_dropped)
+        # 按规则的处置分流：命中任一 deny 规则 → 剥离（不再送 LLM）；只命中 warn 规则 → 保留 + 记线索。
+        sc_cfg = self._config.inspect.static_checks
+        deny_hit_tools: list[str] = []
+        warn_hits: dict[str, list[str]] = {}
+        for hit in sc_report.hits:
+            if sc_cfg.action_for(hit.rule_id) is StaticCheckAction.DENY:
+                if hit.tool not in deny_hit_tools:
+                    deny_hit_tools.append(hit.tool)
+            else:
+                rules = warn_hits.setdefault(hit.tool, [])
+                if hit.rule_id not in rules:
+                    rules.append(hit.rule_id)
+        static_dropped = [t for t in deny_hit_tools if t not in set(drop)]
+        drop.extend(static_dropped)
+        for tool_name in deny_hit_tools:
+            warn_hits.pop(tool_name, None)
 
         # ⑥ 语义检测：只送还没被剥离的 tool；模型不可用 / 输出不合法按配置处置。
         sem_report: SemanticReport | None = None
@@ -1071,7 +1084,7 @@ class Proxy:
             except DetectorError as exc:
                 return self._deny_whole_tools_list(message, tools, exc, detectors, rpc_id, latency)
             detectors.append(sem_report.outcome())
-            semantic_dropped = self._apply_semantic(sem_report)
+            semantic_dropped = self._apply_semantic(sem_report, warn_hits)
             drop.extend(t for t in semantic_dropped if t not in dropped)
 
         if not drop:
@@ -1081,6 +1094,7 @@ class Proxy:
                 decision=Decision.ALLOW,
                 decision_by=DecisionBy.DEFAULT,
                 rpc_id=rpc_id,
+                reason=_warning_reason(warn_hits, sem_report),
                 detectors=detectors,
                 payload=message,
                 latency_ms=latency,
@@ -1103,7 +1117,13 @@ class Proxy:
             decision=Decision.DENY,
             decision_by=decision_by,
             rpc_id=rpc_id,
-            reason=_strip_reason(drop, sc_report.hits, sem_report),
+            reason=_join_reasons(
+                _strip_reason(drop, sc_report.hits, sem_report),
+                _warning_reason(
+                    {t: r for t, r in warn_hits.items() if t not in set(drop)}, sem_report,
+                    exclude=set(drop),
+                ),
+            ),
             detectors=detectors,
             payload=message,
             latency_ms=latency,
@@ -1138,8 +1158,13 @@ class Proxy:
         )
         return Routed(client=OutgoingLine.rewritten(stripped))
 
-    def _apply_semantic(self, report: SemanticReport) -> list[str]:
-        """记日志，返回要剥离的 tool 名。模型给的理由过 visible_escape 再落盘。"""
+    def _apply_semantic(
+        self, report: SemanticReport, warn_hits: Mapping[str, Sequence[str]]
+    ) -> list[str]:
+        """记日志，返回要剥离的 tool 名。模型给的理由过 visible_escape 再落盘。
+
+        :param warn_hits: 只命中 warn 规则的 tool → 规则 id。模型不可用时作为线索写进告警。
+        """
         cfg = self._config.inspect.semantic
         to_drop: list[str] = []
         for verdict in report.verdicts:
@@ -1156,8 +1181,10 @@ class Proxy:
             self._log.warn(f"semantic detection failed: {static_mod.visible_escape(detail)}")
         for tool, kind in report.failures.items():
             action = cfg.on_unavailable if kind is FailureKind.UNAVAILABLE else cfg.on_invalid_output
+            hint = warn_hits.get(tool)
             self._log.warn(
                 f"semantic {kind} for {self._server_name}/{tool} -> {action}"
+                + (f"; static warn hits: {','.join(hint)}" if hint else "")
             )
             if action is SemanticFailureAction.DENY:
                 to_drop.append(tool)
@@ -1337,6 +1364,27 @@ def _tool_name(tool: Any) -> str:
     """和 static_checks / semantic 一致的 tool 名取法（没有 name 时用占位名）。"""
     name = tool.get("name") if isinstance(tool, Mapping) else None
     return name if isinstance(name, str) and name else static_mod.UNNAMED_TOOL
+
+
+def _warning_reason(
+    warn_hits: Mapping[str, Sequence[str]],
+    semantic: SemanticReport | None,
+    *,
+    exclude: set[str] | None = None,
+) -> str | None:
+    """保留下来的 tool 上的告警：warn 规则命中 + 语义检测没判定成的。没有就返回 None。"""
+    exclude = exclude or set()
+    parts = [f"{t}:{','.join(r)}" for t, r in warn_hits.items() if t not in exclude]
+    reason = f"static_checks warn: {'; '.join(parts[:_MAX_REASON_HITS])}" if parts else ""
+    if semantic is not None:
+        missing = [f"{t}:{k}" for t, k in semantic.failures.items() if t not in exclude]
+        if missing:
+            reason = _join_reasons(reason, f"semantic unjudged: {'; '.join(missing[:_MAX_REASON_HITS])}")
+    return reason or None
+
+
+def _join_reasons(*reasons: str | None) -> str:
+    return " | ".join(r for r in reasons if r)
 
 
 def _strip_reason(

@@ -322,11 +322,15 @@ class PatternRule:
 
     ``regex`` 在**配置解析期**编译，编译失败直接 ConfigError（启动期拒绝），
     运行期不会再因为坏正则抛异常。
+
+    ``on_hit`` 只有静态检查规则可以写（脱敏规则写了会被配置校验拒绝）；
+    None 表示沿用 ``inspect.static_checks.on_hit``。
     """
 
     id: str
     pattern: str
     regex: re.Pattern[str]
+    on_hit: StaticCheckAction | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -343,6 +347,13 @@ class StaticChecksConfig:
         "annotations",
     )
     rules: tuple[PatternRule, ...] = ()
+
+    def action_for(self, rule_id: str) -> StaticCheckAction:
+        """某条规则命中后的处置：规则自己写了 ``on_hit`` 就用它，否则沿用整段的。"""
+        for rule in self.rules:
+            if rule.id == rule_id:
+                return rule.on_hit or self.on_hit
+        return self.on_hit
 
 
 @dataclass(frozen=True, slots=True)

@@ -33,7 +33,7 @@ from eval.mcptox.load import LOADER_VERSION, Sample
 from eval.mcptox.split import SPLIT_PATH
 from mcp_guarder import config as config_mod
 from mcp_guarder import static_checks
-from mcp_guarder.types import StaticChecksConfig
+from mcp_guarder.types import StaticCheckAction, StaticChecksConfig
 
 EVAL_DIR = Path(__file__).resolve().parent
 RULES_DIR = EVAL_DIR / "rules"
@@ -79,7 +79,17 @@ def evaluate(samples: list[Sample], cfg: StaticChecksConfig) -> dict[str, Any]:
             errors.append({"id": s.id, "error": repr(exc)})
             continue
         hits[s.id] = sorted({h.rule_id for h in found})
-    return metrics(samples, hits, errors, rule_ids=[r.id for r in cfg.rules])
+    result = metrics(samples, hits, errors, rule_ids=[r.id for r in cfg.rules])
+    # deny 层：只算处置为 deny 的规则 —— 这才是真正会剥离 tool 的部分。
+    deny_rules = {r.id for r in cfg.rules if cfg.action_for(r.id) is StaticCheckAction.DENY}
+    deny_hits = {sid: [r for r in rules if r in deny_rules] for sid, rules in hits.items()}
+    deny = metrics(samples, deny_hits, errors, rule_ids=[])
+    result["deny_layer"] = {
+        "rule_ids": sorted(deny_rules),
+        "recall": deny["recall"],
+        "false_positive_rate": deny["false_positive_rate"],
+    }
+    return result
 
 
 def metrics(
@@ -186,6 +196,13 @@ def main(argv: list[str] | None = None) -> int:
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
+    dl = result["deny_layer"]
+    if len(dl["rule_ids"]) != len(result["meta"]["rule_ids"]):
+        print(
+            f"[{args.rules}/{args.split}] deny layer: recall {dl['recall']['k']}/{dl['recall']['n']}  "
+            f"FPR {dl['false_positive_rate']['k']}/{dl['false_positive_rate']['n']}",
+            file=sys.stderr,
+        )
     r, f = result["recall"], result["false_positive_rate"]
     print(
         f"[{args.rules}/{args.split}] recall {r['k']}/{r['n']} ({r['rate']}, ci95 {r['ci95']})  "

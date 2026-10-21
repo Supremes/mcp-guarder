@@ -114,6 +114,8 @@ _AUDIT_KEYS = ("path", "fsync", "record", "payload", "log_file", "snapshot_dir")
 _AUDIT_RECORD_KEYS = ("tools_list", "tools_call", "other_methods")
 _AUDIT_PAYLOAD_KEYS = ("max_bytes", "store_redacted_only")
 _PATTERN_RULE_KEYS = ("id", "pattern")
+#: 静态检查规则额外允许的可选 key。
+_STATIC_RULE_OPTIONAL_KEYS = ("on_hit",)
 
 #: ``audit.path`` 模板里允许出现的占位符（SPEC §4）。
 _AUDIT_PATH_PLACEHOLDERS = frozenset({"server", "date"})
@@ -451,13 +453,17 @@ def compile_pattern_rules(
     raw_rules: Sequence[Mapping[str, Any]] | Sequence[tuple[str, str]],
     *,
     where: str,
+    allow_on_hit: bool = False,
 ) -> tuple[PatternRule, ...]:
     """把 ``[{id, pattern}, ...]`` 编译成 :class:`PatternRule` 元组。
 
     正则编译失败 → ConfigError（启动期就拒，别留到运行期变成 DetectorError）。
     也接受 ``[(id, pattern), ...]`` 形态，方便直接吃
     :data:`~mcp_guarder.types.SPEC_STATIC_RULES` 这类常量。
+
+    :param allow_on_hit: 只有静态检查规则传 True，允许可选的 ``on_hit: deny|warn``。
     """
+    allowed_keys = _PATTERN_RULE_KEYS + (_STATIC_RULE_OPTIONAL_KEYS if allow_on_hit else ())
     items = _require_list(raw_rules, where=where)
 
     problems: list[str] = []
@@ -472,7 +478,7 @@ def compile_pattern_rules(
             _capture(
                 problems,
                 lambda it=item, w=item_where: ensure_no_unknown_keys(
-                    it, _PATTERN_RULE_KEYS, where=w
+                    it, allowed_keys, where=w
                 ),
             )
             missing = [key for key in _PATTERN_RULE_KEYS if key not in item]
@@ -481,6 +487,7 @@ def compile_pattern_rules(
                 continue
             rule_id = item["id"]
             pattern = item["pattern"]
+            raw_on_hit = item.get("on_hit") if allow_on_hit else None
         elif isinstance(item, (tuple, list)) and not isinstance(item, (str, bytes)):
             if len(item) != 2:
                 problems.append(
@@ -488,6 +495,7 @@ def compile_pattern_rules(
                 )
                 continue
             rule_id, pattern = item
+            raw_on_hit = None
         else:
             problems.append(
                 f"{item_where}: expected a mapping with keys {list(_PATTERN_RULE_KEYS)}, "
@@ -511,7 +519,20 @@ def compile_pattern_rules(
         if regex is None:
             continue
 
-        rules.append(PatternRule(id=checked_id, pattern=checked_pattern, regex=regex))
+        on_hit = None
+        if raw_on_hit is not None:
+            on_hit = _capture(
+                problems,
+                lambda v=raw_on_hit, w=item_where: coerce_enum(
+                    v, StaticCheckAction, where=f"{w}.on_hit"
+                ),
+            )
+            if on_hit is None:
+                continue
+
+        rules.append(
+            PatternRule(id=checked_id, pattern=checked_pattern, regex=regex, on_hit=on_hit)
+        )
 
     if problems:
         raise ConfigError(f"invalid pattern rules in {where}", problems=problems, field_path=where)
@@ -932,6 +953,7 @@ def _parse_static_checks(raw: Any) -> StaticChecksConfig:
         lambda: compile_pattern_rules(
             section["rules"] if "rules" in section else SPEC_STATIC_RULES,
             where="inspect.static_checks.rules",
+            allow_on_hit=True,
         ),
     )
 
