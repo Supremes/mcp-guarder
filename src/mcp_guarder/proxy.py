@@ -40,6 +40,7 @@ from mcp_guarder import audit as audit_mod
 from mcp_guarder import fingerprint as fingerprint_mod
 from mcp_guarder import policy as policy_mod
 from mcp_guarder import redact as redact_mod
+from mcp_guarder import semantic as semantic_mod
 from mcp_guarder import static_checks as static_mod
 from mcp_guarder.audit import AuditLogger, GuardLog
 from mcp_guarder.errors import (
@@ -50,6 +51,7 @@ from mcp_guarder.errors import (
     UpstreamCrash,
 )
 from mcp_guarder.fingerprint import FingerprintStore
+from mcp_guarder.semantic import FailureKind, SemanticJudge, SemanticReport, VerdictCache
 from mcp_guarder.types import (
     EXIT_GENERIC_ERROR,
     EXIT_OK,
@@ -73,6 +75,7 @@ from mcp_guarder.types import (
     MessageKind,
     OutgoingLine,
     RedactAction,
+    SemanticFailureAction,
     Routed,
     StaticCheckAction,
     UpstreamInfo,
@@ -98,6 +101,7 @@ _DETECTOR_TO_DECISION_BY = {
     DetectorName.STATIC_CHECKS: DecisionBy.STATIC_CHECKS,
     DetectorName.REDACT: DecisionBy.REDACT,
     DetectorName.POLICY: DecisionBy.POLICY,
+    DetectorName.SEMANTIC: DecisionBy.SEMANTIC,
 }
 
 #: 审计里给「没有 method 可用」的报文兜底的 event 名。
@@ -377,10 +381,12 @@ class Proxy:
         audit: AuditLogger,
         log: GuardLog,
         fingerprints: FingerprintStore,
+        semantic: SemanticJudge | None = None,
         stdin: BinaryIO | None = None,
         stdout: BinaryIO | None = None,
     ) -> None:
         """:param command: ``--`` 之后的完整命令行，**原样传给子进程，不做 shell 拼接**。
+        :param semantic: LLM 语义检测器；``inspect.semantic.enabled`` 为 false 时传 None。
         :param stdin/stdout: 默认取 ``sys.stdin.buffer`` / ``sys.stdout.buffer``；
             测试里注入 ``io.BytesIO`` 用。
         """
@@ -389,6 +395,7 @@ class Proxy:
         self._audit = audit
         self._log = log
         self._fingerprints = fingerprints
+        self._semantic = semantic
         self._stdin: BinaryIO = stdin if stdin is not None else sys.stdin.buffer
         self._stdout: BinaryIO = stdout if stdout is not None else sys.stdout.buffer
 
@@ -1041,30 +1048,27 @@ class Proxy:
                     f"{hit.field_path} {hit.rule_id}: {hit.excerpt}"
                 )
         except DetectorError as exc:
-            # fail-closed：整条 tools/list 的工具全部剥光，返回空列表。
-            self._log.exception("detector failure on tools/list", exc)
-            detectors.append(DetectorOutcome(exc.detector, DetectorResult.ERROR))
-            # 按**下标**全剥：按名字剥只认得有 name 的条目，会把匿名 tool
-            # （以及形态不对的条目）漏在响应里 —— 而那正是检测器炸掉的常见原因。
-            stripped = strip_tools_at(message, range(len(tools)))
-            self._safe_audit(
-                event=METHOD_TOOLS_LIST,
-                direction=Direction.SERVER_TO_CLIENT,
-                decision=Decision.DENY,
-                decision_by=_DETECTOR_TO_DECISION_BY.get(exc.detector, DecisionBy.DEFAULT),
-                rpc_id=rpc_id,
-                reason="detector failure",
-                detectors=detectors,
-                payload=message,
-                latency_ms=latency,
-            )
-            return Routed(client=OutgoingLine.rewritten(stripped))
+            return self._deny_whole_tools_list(message, tools, exc, detectors, rpc_id, latency)
 
         drop: list[str] = list(fp_report.changed_tools)
         static_dropped: list[str] = []
         if self._config.inspect.static_checks.on_hit is StaticCheckAction.DENY:
             static_dropped = [t for t in sc_report.hit_tools if t not in set(drop)]
             drop.extend(static_dropped)
+
+        # ⑥ 语义检测：只送还没被剥离的 tool；模型不可用 / 输出不合法按配置处置。
+        sem_report: SemanticReport | None = None
+        semantic_dropped: list[str] = []
+        if self._semantic is not None and self._config.inspect.semantic.enabled:
+            dropped = set(drop)
+            remaining = [t for t in tools if _tool_name(t) not in dropped]
+            try:
+                sem_report = self._semantic.judge(remaining, server=self._server_name)
+            except DetectorError as exc:
+                return self._deny_whole_tools_list(message, tools, exc, detectors, rpc_id, latency)
+            detectors.append(sem_report.outcome())
+            semantic_dropped = self._apply_semantic(sem_report)
+            drop.extend(t for t in semantic_dropped if t not in dropped)
 
         if not drop:
             self._safe_audit(
@@ -1080,9 +1084,12 @@ class Proxy:
             return Routed(client=OutgoingLine.verbatim(raw))
 
         stripped = strip_tools(message, drop)
-        decision_by = (
-            DecisionBy.FINGERPRINT if fp_report.changed_tools else DecisionBy.STATIC_CHECKS
-        )
+        if fp_report.changed_tools:
+            decision_by = DecisionBy.FINGERPRINT
+        elif static_dropped:
+            decision_by = DecisionBy.STATIC_CHECKS
+        else:
+            decision_by = DecisionBy.SEMANTIC
         self._log.warn(
             f"stripped {len(drop)} tool(s) from tools/list: {','.join(drop)}"
         )
@@ -1092,12 +1099,65 @@ class Proxy:
             decision=Decision.DENY,
             decision_by=decision_by,
             rpc_id=rpc_id,
-            reason=_strip_reason(drop, sc_report.hits),
+            reason=_strip_reason(drop, sc_report.hits, sem_report),
             detectors=detectors,
             payload=message,
             latency_ms=latency,
         )
         return Routed(client=OutgoingLine.rewritten(stripped))
+
+    def _deny_whole_tools_list(
+        self,
+        message: JsonObj,
+        tools: Sequence[Any],
+        exc: DetectorError,
+        detectors: list[DetectorOutcome],
+        rpc_id: Any,
+        latency: LatencyMs | None,
+    ) -> Routed:
+        """检测器自己炸了 → fail-closed：整条 tools/list 的工具全部剥光，返回空列表。"""
+        self._log.exception("detector failure on tools/list", exc)
+        detectors.append(DetectorOutcome(exc.detector, DetectorResult.ERROR))
+        # 按**下标**全剥：按名字剥只认得有 name 的条目，会把匿名 tool
+        # （以及形态不对的条目）漏在响应里 —— 而那正是检测器炸掉的常见原因。
+        stripped = strip_tools_at(message, range(len(tools)))
+        self._safe_audit(
+            event=METHOD_TOOLS_LIST,
+            direction=Direction.SERVER_TO_CLIENT,
+            decision=Decision.DENY,
+            decision_by=_DETECTOR_TO_DECISION_BY.get(exc.detector, DecisionBy.DEFAULT),
+            rpc_id=rpc_id,
+            reason="detector failure",
+            detectors=detectors,
+            payload=message,
+            latency_ms=latency,
+        )
+        return Routed(client=OutgoingLine.rewritten(stripped))
+
+    def _apply_semantic(self, report: SemanticReport) -> list[str]:
+        """记日志，返回要剥离的 tool 名。模型给的理由过 visible_escape 再落盘。"""
+        cfg = self._config.inspect.semantic
+        to_drop: list[str] = []
+        for verdict in report.verdicts:
+            if verdict.verdict is not semantic_mod.Verdict.MALICIOUS:
+                continue
+            self._log.warn(
+                f"SEMANTIC HIT {self._server_name}/{verdict.tool} "
+                f"confidence={verdict.confidence:.2f}{' (cached)' if verdict.cached else ''}: "
+                f"{static_mod.visible_escape(verdict.reason)}"
+            )
+            if cfg.on_hit is StaticCheckAction.DENY:
+                to_drop.append(verdict.tool)
+        for detail in report.failure_details:
+            self._log.warn(f"semantic detection failed: {static_mod.visible_escape(detail)}")
+        for tool, kind in report.failures.items():
+            action = cfg.on_unavailable if kind is FailureKind.UNAVAILABLE else cfg.on_invalid_output
+            self._log.warn(
+                f"semantic {kind} for {self._server_name}/{tool} -> {action}"
+            )
+            if action is SemanticFailureAction.DENY:
+                to_drop.append(tool)
+        return to_drop
 
     def _handle_tools_call_response(self, message: JsonObj, raw: bytes) -> Routed:
         """``tools/call`` 响应的深加工：⑦ 回流脱敏（SPEC §2 T4/T5/T7 / §7 M2-3）。"""
@@ -1269,7 +1329,15 @@ def _process_group_alive(pgid: int) -> bool:
 _MAX_REASON_HITS = 8
 
 
-def _strip_reason(drop: Sequence[str], hits: Sequence[Any]) -> str:
+def _tool_name(tool: Any) -> str:
+    """和 static_checks / semantic 一致的 tool 名取法（没有 name 时用占位名）。"""
+    name = tool.get("name") if isinstance(tool, Mapping) else None
+    return name if isinstance(name, str) and name else static_mod.UNNAMED_TOOL
+
+
+def _strip_reason(
+    drop: Sequence[str], hits: Sequence[Any], semantic: SemanticReport | None = None
+) -> str:
     """拼 ``tools/list`` 被剥离时的审计 ``reason``。
 
     带上静态检查的命中明细（``<tool>.<field>:<rule_id>:<excerpt>``）——
@@ -1277,12 +1345,22 @@ def _strip_reason(drop: Sequence[str], hits: Sequence[Any]) -> str:
     是可见的 ``\\x1b[`` 字面量而不是真控制字符（SPEC §7 M3-3）。
     """
     reason = f"stripped tools: {','.join(drop)}"
-    if not hits:
-        return reason
-    details = "; ".join(
-        f"{h.tool}.{h.field_path}:{h.rule_id}:{h.excerpt}" for h in hits[:_MAX_REASON_HITS]
-    )
-    return f"{reason} | static_checks: {details}"
+    if hits:
+        details = "; ".join(
+            f"{h.tool}.{h.field_path}:{h.rule_id}:{h.excerpt}" for h in hits[:_MAX_REASON_HITS]
+        )
+        reason = f"{reason} | static_checks: {details}"
+    if semantic is not None:
+        dropped = set(drop)
+        parts = [
+            f"{v.tool}:{v.verdict}:{static_mod.visible_escape(v.reason)}"
+            for v in semantic.verdicts
+            if v.tool in dropped and v.verdict is semantic_mod.Verdict.MALICIOUS
+        ][:_MAX_REASON_HITS]
+        parts += [f"{t}:{k}" for t, k in semantic.failures.items() if t in dropped]
+        if parts:
+            reason = f"{reason} | semantic: {'; '.join(parts)}"
+    return reason
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -1316,6 +1394,7 @@ def run_proxy(
     )
     store = FingerprintStore(config.inspect.fingerprint.store)
     opened_store = False
+    sem_cache: VerdictCache | None = None
     stuck_reader = False
     code = EXIT_GENERIC_ERROR
     try:
@@ -1331,6 +1410,19 @@ def run_proxy(
                     path=config_path,
                     field_path="inspect.fingerprint.store",
                 ) from exc
+        judge: SemanticJudge | None = None
+        if config.inspect.semantic.enabled:
+            sem_cache = VerdictCache(config.inspect.semantic.cache)
+            try:
+                sem_cache.open()
+            except Exception as exc:  # noqa: BLE001 - sqlite / OSError 都算启动期配置问题
+                sem_cache = None
+                raise ConfigError(
+                    f"cannot open semantic cache {config.inspect.semantic.cache}: {exc}",
+                    path=config_path,
+                    field_path="inspect.semantic.cache",
+                ) from exc
+            judge = SemanticJudge(config.inspect.semantic, cache=sem_cache)
         if config.source_path is None and config_path is not None:
             config = _with_source(config, config_path)
         proxy = Proxy(
@@ -1339,6 +1431,7 @@ def run_proxy(
             audit=audit,
             log=log,
             fingerprints=store,
+            semantic=judge,
         )
         code = proxy.run()
         # 泵 A 还卡在客户端 stdin 上 → 正常 finalize 会 SIGABRT，见 docstring。
@@ -1348,6 +1441,11 @@ def run_proxy(
         if opened_store:
             try:
                 store.close()
+            except Exception:  # noqa: BLE001
+                pass
+        if sem_cache is not None:
+            try:
+                sem_cache.close()
             except Exception:  # noqa: BLE001
                 pass
         try:

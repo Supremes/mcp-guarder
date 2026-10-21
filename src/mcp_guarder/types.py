@@ -112,6 +112,7 @@ class DecisionBy(StrEnum):
     FINGERPRINT = "fingerprint"
     STATIC_CHECKS = "static_checks"
     REDACT = "redact"
+    SEMANTIC = "semantic"
     DEFAULT = "default"  # 没有任何规则命中，落到 defaults.* 的兜底
 
 
@@ -122,6 +123,7 @@ class DetectorName(StrEnum):
     STATIC_CHECKS = "static_checks"
     REDACT = "redact"
     POLICY = "policy"
+    SEMANTIC = "semantic"
 
 
 class DetectorResult(StrEnum):
@@ -185,6 +187,13 @@ class StaticCheckAction(StrEnum):
 
     DENY = "deny"  # 命中即把该 tool 从 tools/list 剥离
     WARN = "warn"  # 只记 guard.log + 审计，不剥离
+
+
+class SemanticFailureAction(StrEnum):
+    """``inspect.semantic.on_unavailable`` / ``on_invalid_output``：没拿到有效判定时怎么处置。"""
+
+    WARN = "warn"  # 放行 + guard.log 告警，结果不缓存，下次重试
+    DENY = "deny"  # 把没判定成的 tool 从 tools/list 剥离
 
 
 class RedactAction(StrEnum):
@@ -337,11 +346,32 @@ class StaticChecksConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class SemanticConfig:
+    """``inspect.semantic:`` 段：LLM 语义投毒检测（OpenAI 兼容 Chat Completions 接口）。
+
+    默认关闭。只在 tool 首次出现或定义变化时调用模型（按定义摘要缓存判定）。
+    """
+
+    enabled: bool = False
+    base_url: str = ""  # 例如 http://localhost:11434/v1
+    model: str = ""
+    api_key_env: str | None = None  # 只存环境变量名，key 本身绝不进配置和审计
+    timeout_s: float = 20.0  # 一次 tools/list 的总时间预算（含所有批次）
+    max_tools_per_request: int = 16
+    response_format: str = "json_schema"  # json_schema | json_object | none
+    on_hit: StaticCheckAction = StaticCheckAction.DENY
+    on_unavailable: SemanticFailureAction = SemanticFailureAction.WARN  # 超时 / 连不上 / HTTP 错误
+    on_invalid_output: SemanticFailureAction = SemanticFailureAction.DENY  # 输出不合法，可能是被注入
+    cache: Path = Path("~/.mcp-guarder/semantic_cache.sqlite")  # 解析期已展开为绝对路径
+
+
+@dataclass(frozen=True, slots=True)
 class InspectConfig:
     """``inspect:`` 段。"""
 
     fingerprint: FingerprintConfig = field(default_factory=FingerprintConfig)
     static_checks: StaticChecksConfig = field(default_factory=StaticChecksConfig)
+    semantic: SemanticConfig = field(default_factory=SemanticConfig)
 
 
 @dataclass(frozen=True, slots=True)
@@ -855,6 +885,8 @@ __all__ = [
     "FingerprintConfig",
     "PatternRule",
     "StaticChecksConfig",
+    "SemanticConfig",
+    "SemanticFailureAction",
     "InspectConfig",
     "WhenCondition",
     "PolicyRule",

@@ -63,6 +63,8 @@ from mcp_guarder.types import (
     RecordMode,
     RedactAction,
     RedactConfig,
+    SemanticConfig,
+    SemanticFailureAction,
     ServerConfig,
     StaticCheckAction,
     StaticChecksConfig,
@@ -78,9 +80,24 @@ from mcp_guarder.types import (
 _TOP_LEVEL_KEYS = ("version", "server", "defaults", "inspect", "policy", "redact", "audit")
 _SERVER_KEYS = ("name", "transport")
 _DEFAULTS_KEYS = tuple(ALLOWED_DEFAULT_ACTIONS)
-_INSPECT_KEYS = ("fingerprint", "static_checks")
+_INSPECT_KEYS = ("fingerprint", "static_checks", "semantic")
 _FINGERPRINT_KEYS = ("enabled", "store", "fields", "on_first_seen", "on_change")
 _STATIC_CHECKS_KEYS = ("enabled", "on_hit", "scan_fields", "rules")
+_SEMANTIC_KEYS = (
+    "enabled",
+    "base_url",
+    "model",
+    "api_key_env",
+    "timeout_s",
+    "max_tools_per_request",
+    "response_format",
+    "on_hit",
+    "on_unavailable",
+    "on_invalid_output",
+    "cache",
+)
+_SEMANTIC_RESPONSE_FORMATS = ("json_schema", "json_object", "none")
+_ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _POLICY_KEYS = ("rules", "deny_response")
 _POLICY_RULE_KEYS = ("id", "tool", "allow", "when", "reason")
 _DENY_RESPONSE_KEYS = ("kind", "text")
@@ -750,6 +767,7 @@ def _parse_inspect(raw: Any) -> InspectConfig:
         return InspectConfig(
             fingerprint=_parse_fingerprint(None),
             static_checks=_parse_static_checks(None),
+            semantic=_parse_semantic(None),
         )
     section = _require_mapping(raw, where="inspect")
 
@@ -757,12 +775,14 @@ def _parse_inspect(raw: Any) -> InspectConfig:
     _capture(problems, lambda: ensure_no_unknown_keys(section, _INSPECT_KEYS, where="inspect"))
     fingerprint = _capture(problems, lambda: _parse_fingerprint(section.get("fingerprint")))
     static_checks = _capture(problems, lambda: _parse_static_checks(section.get("static_checks")))
+    semantic = _capture(problems, lambda: _parse_semantic(section.get("semantic")))
 
     if problems:
         raise ConfigError("invalid inspect section", problems=problems)
     return InspectConfig(
         fingerprint=fingerprint or _parse_fingerprint(None),
         static_checks=static_checks or _parse_static_checks(None),
+        semantic=semantic or _parse_semantic(None),
     )
 
 
@@ -923,6 +943,87 @@ def _parse_static_checks(raw: Any) -> StaticChecksConfig:
         scan_fields=scan_fields,
         rules=rules or (),
     )
+
+
+def _parse_semantic(raw: Any) -> SemanticConfig:
+    """``inspect.semantic:`` 段。默认关闭；开启时 ``base_url`` 和 ``model`` 必填。
+
+    API key 只接受环境变量**名**（``api_key_env``），配置文件里不允许出现 key 本身。
+    """
+    defaults = SemanticConfig()
+    if raw is None:
+        return SemanticConfig(cache=expand_path(defaults.cache))
+    section = _require_mapping(raw, where="inspect.semantic")
+    where = "inspect.semantic"
+
+    problems: list[str] = []
+    _capture(problems, lambda: ensure_no_unknown_keys(section, _SEMANTIC_KEYS, where=where))
+    values: dict[str, Any] = {}
+
+    def take(key: str, parse: Callable[[Any], Any]) -> None:
+        if key in section:
+            value = _capture(problems, lambda: parse(section[key]))
+            if value is not None:
+                values[key] = value
+
+    take("enabled", lambda v: _require_bool(v, where=f"{where}.enabled"))
+    take("base_url", lambda v: _require_http_url(v, where=f"{where}.base_url"))
+    take("model", lambda v: _require_str(v, where=f"{where}.model"))
+    take("api_key_env", lambda v: _require_env_name(v, where=f"{where}.api_key_env"))
+    take("timeout_s", lambda v: _require_positive_number(v, where=f"{where}.timeout_s"))
+    take(
+        "max_tools_per_request",
+        lambda v: _require_int(v, where=f"{where}.max_tools_per_request", minimum=1),
+    )
+    take("response_format", lambda v: _require_choice(
+        v, _SEMANTIC_RESPONSE_FORMATS, where=f"{where}.response_format"
+    ))
+    take("on_hit", lambda v: coerce_enum(v, StaticCheckAction, where=f"{where}.on_hit"))
+    take("on_unavailable", lambda v: coerce_enum(
+        v, SemanticFailureAction, where=f"{where}.on_unavailable"
+    ))
+    take("on_invalid_output", lambda v: coerce_enum(
+        v, SemanticFailureAction, where=f"{where}.on_invalid_output"
+    ))
+    take("cache", lambda v: _require_path_like(v, where=f"{where}.cache"))
+
+    enabled = values.get("enabled", defaults.enabled)
+    if enabled:
+        for key in ("base_url", "model"):
+            if key not in values and not any(key in p for p in problems):
+                problems.append(f"{where}.{key}: required when semantic detection is enabled")
+
+    if problems:
+        raise ConfigError("invalid inspect.semantic section", problems=problems)
+    values["cache"] = expand_path(values.get("cache", defaults.cache))
+    return SemanticConfig(**values)
+
+
+def _require_http_url(value: Any, *, where: str) -> str:
+    text = _require_str(value, where=where).rstrip("/")
+    if not re.match(r"^https?://[^\s/]+", text):
+        _fail(where, f"expected an http(s) URL, got {value!r}")
+    return text
+
+
+def _require_env_name(value: Any, *, where: str) -> str:
+    text = _require_str(value, where=where)
+    if not _ENV_NAME.match(text):
+        _fail(where, f"expected an environment variable name, got {value!r}")
+    return text
+
+
+def _require_positive_number(value: Any, *, where: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+        _fail(where, f"expected a positive number, got {value!r}")
+    return float(value)
+
+
+def _require_choice(value: Any, choices: Sequence[str], *, where: str) -> str:
+    text = _require_str(value, where=where)
+    if text not in choices:
+        _fail(where, f"expected one of {', '.join(choices)}, got {value!r}")
+    return text
 
 
 def _parse_policy_rule(raw: Any, *, index: int) -> PolicyRule:
