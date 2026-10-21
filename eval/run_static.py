@@ -79,7 +79,18 @@ def evaluate(samples: list[Sample], cfg: StaticChecksConfig) -> dict[str, Any]:
             errors.append({"id": s.id, "error": repr(exc)})
             continue
         hits[s.id] = sorted({h.rule_id for h in found})
+    return metrics(samples, hits, errors, rule_ids=[r.id for r in cfg.rules])
 
+
+def metrics(
+    samples: list[Sample],
+    hits: dict[str, list[str]],
+    errors: list[dict[str, str]],
+    *,
+    rule_ids: list[str],
+) -> dict[str, Any]:
+    """``hits``：已判定样本 → 命中的标签（规则 id 或 ``semantic``）；空列表 = 判为正常。
+    不在 ``hits`` 里的样本视为没判定成（错误），单独计数，不进任何分母。"""
     scanned = [s for s in samples if s.id in hits]
     poisoned = [s for s in scanned if s.label == "poisoned"]
     clean = [s for s in scanned if s.label == "clean"]
@@ -96,13 +107,13 @@ def evaluate(samples: list[Sample], cfg: StaticChecksConfig) -> dict[str, Any]:
         }
 
     per_rule: dict[str, dict[str, int]] = {}
-    for rule in cfg.rules:
-        on_p = [s for s in poisoned if rule.id in hits[s.id]]
-        on_c = [s for s in clean if rule.id in hits[s.id]]
-        per_rule[rule.id] = {
+    for rule_id in rule_ids:
+        on_p = [s for s in poisoned if rule_id in hits[s.id]]
+        on_c = [s for s in clean if rule_id in hits[s.id]]
+        per_rule[rule_id] = {
             "poisoned_hits": len(on_p),
             "clean_hits": len(on_c),
-            "unique_poisoned_hits": sum(hits[s.id] == [rule.id] for s in on_p),
+            "unique_poisoned_hits": sum(hits[s.id] == [rule_id] for s in on_p),
         }
 
     clean_by_server = Counter(s.server for s in clean if hits[s.id])

@@ -564,3 +564,12 @@ def test_cli_end_to_end_with_fake_openai(
 
 # make_server fixture 复用 test_proxy 的实现
 from tests.test_proxy import make_server  # noqa: E402,F401
+
+
+def test_model_sees_the_whole_server_tool_list(semantic_proxy: Callable[..., Proxy]) -> None:
+    """被静态规则剥掉的 tool 不送检，但它的名字仍作为上下文出现在名单里。"""
+    model = FakeModel()
+    proxy = semantic_proxy(model)
+    list_tools(proxy, [tool("echo"), tool("bad", "<IMPORTANT>x</IMPORTANT>"), tool("calc")])
+    user = model.calls[0]["body"]["messages"][1]["content"]
+    assert 'All tool names exposed by this server: ["echo", "bad", "calc"]' in user

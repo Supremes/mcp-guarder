@@ -396,20 +396,34 @@ class SemanticJudge:
         self._client = ChatClient(config, transport)
         self._clock = clock
 
-    def judge(self, tools: Sequence[Mapping[str, Any]], *, server: str) -> SemanticReport:
+    def judge(
+        self,
+        tools: Sequence[Mapping[str, Any]],
+        *,
+        server: str,
+        sibling_names: Sequence[str] | None = None,
+    ) -> SemanticReport:
+        """:param sibling_names: 这个 Server 暴露的全部工具名，作为判定上下文；缺省用 ``tools`` 的名字。"""
         if not self._config.enabled:
             return SemanticReport(skipped=True)
         try:
-            return self._judge(tools, server=server)
+            return self._judge(tools, server=server, sibling_names=sibling_names)
         except DetectorError:
             raise
         except Exception as exc:  # noqa: BLE001 —— 检测器统一 fail-closed
             raise DetectorError.wrap(DetectorName.SEMANTIC, exc) from exc
 
-    def _judge(self, tools: Sequence[Mapping[str, Any]], *, server: str) -> SemanticReport:
+    def _judge(
+        self,
+        tools: Sequence[Mapping[str, Any]],
+        *,
+        server: str,
+        sibling_names: Sequence[str] | None,
+    ) -> SemanticReport:
         cfg = self._config
         deadline = self._clock() + cfg.timeout_s
         names = [str(t.get("name", "<unnamed>")) for t in tools]
+        siblings = list(sibling_names) if sibling_names is not None else names
         verdicts: list[ToolVerdict] = []
         pending: list[tuple[str, Mapping[str, Any]]] = []
         for name, tool in zip(names, tools):
@@ -432,7 +446,7 @@ class SemanticJudge:
                 details.append(f"time budget of {cfg.timeout_s}s exhausted")
                 continue
             messages = build_messages(
-                [t for _, t in batch], server=server, sibling_names=names, nonce=secrets.token_hex(8)
+                [t for _, t in batch], server=server, sibling_names=siblings, nonce=secrets.token_hex(8)
             )
             calls += 1
             try:

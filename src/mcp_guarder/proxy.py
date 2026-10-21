@@ -1063,7 +1063,11 @@ class Proxy:
             dropped = set(drop)
             remaining = [t for t in tools if _tool_name(t) not in dropped]
             try:
-                sem_report = self._semantic.judge(remaining, server=self._server_name)
+                sem_report = self._semantic.judge(
+                    remaining,
+                    server=self._server_name,
+                    sibling_names=[_tool_name(t) for t in tools],
+                )
             except DetectorError as exc:
                 return self._deny_whole_tools_list(message, tools, exc, detectors, rpc_id, latency)
             detectors.append(sem_report.outcome())
