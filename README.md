@@ -192,7 +192,7 @@ policy:
 
 脱敏动作可选 `mask`（默认，替换为 `[REDACTED:{rule_id}]`）、`drop_field`、`deny_call`；`allowlist` 用于放过 `AKIAIOSFODNN7EXAMPLE` 这类示例值。
 
-内置静态规则主要覆盖标签、敏感路径这类显式特征。另有一套针对语义诱导的可选规则 [`eval/rules/v1.yaml`](eval/rules/v1.yaml)，召回率更高，但在真实描述上存在误报风险，建议配合 `on_hit: warn` 使用，详见[检测效果评测](#检测效果评测)。
+内置静态规则主要覆盖标签、敏感路径这类显式特征。另有针对语义诱导的可选规则集 [`eval/rules/v2.yaml`](eval/rules/v2.yaml)（31 条），召回率更高，但在真实描述上存在误报，建议配合 `on_hit: warn` 使用，详见[检测效果评测](#检测效果评测)。
 
 ## Fail-closed 行为
 
@@ -256,7 +256,7 @@ mcp-guarder audit grep <pattern> [--server S]        # 正则搜索审计记录
 
 | 风险 | 应对 | 局限 |
 |---|---|---|
-| Tool poisoning / line jumping | 静态规则扫描 tool 定义，命中即移除 | 内置规则对语义诱导基本无效（MCPTox 测试集召回 1%，见[检测效果评测](#检测效果评测)）；正则可能误判 |
+| Tool poisoning / line jumping | 静态规则扫描 tool 定义，命中即移除；可选 LLM 语义检测 | 内置规则对语义诱导基本无效（MCPTox 测试集召回 1%，见[检测效果评测](#检测效果评测)）；正则会误判合法写法；LLM 检测效果待评测 |
 | Rug pull | TOFU 指纹，受保护字段变化即拒绝 | 首次出现就带毒时 TOFU 无效，只能靠静态规则补 |
 | Cross-server shadowing | 恶意 Server 的描述被静态规则检查；可信 Server 的越权调用由它自己的 policy 拦截 | 每个 Server 都要单独接入才受保护 |
 | Tool result 间接注入 | 对结果做 secret 脱敏 | v1 只脱敏，不识别结果中的注入指令 |
@@ -268,24 +268,36 @@ HTTP/OAuth 相关风险（confused deputy、token passthrough、metadata SSRF）
 
 ## 检测效果评测
 
-用 [MCPTox](https://github.com/zhiqiangwang4/MCPTox-Benchmark)（485 条投毒 + 362 条正常 tool 描述，45 个真实 Server）离线评测静态规则。按 Server 固定切分开发集和测试集，规则只依据开发集编写，测试集每个版本只跑一次：
+用 [MCPTox](https://github.com/zhiqiangwang4/MCPTox-Benchmark)（485 条投毒 + 362 条正常 tool 描述，45 个真实 Server）和 github-mcp-server 的 141 个真实工具定义，离线评测静态规则。按 Server 固定切分开发集和测试集；GitHub 快照作为留出集，每个规则版本只跑一次：
 
-| 规则 | 测试集召回率 | 测试集误报率 |
+| 规则 | MCPTox 召回 | GitHub 真实描述误报 |
 |---|---|---|
-| 内置 7 条（v0） | 2/207 = 1.0% | 0/132 |
-| 可选结构规则（v1） | 149/207 = 72.0% | 0/132 |
+| 内置 7 条（v0） | 测试集 2/207 = 1.0% | 0/141 |
+| 结构规则 19 条（v1，只看开发集） | 测试集 149/207 = 72.0% | 2/141 = 1.4% |
+| 扩充规则 31 条（v2，用全量编写） | 全量 470/485 = 96.9%（拟合口径） | 3/141 = 2.1% |
 
 - 内置规则对语义投毒基本无效：样本里没有 `<IMPORTANT>` 这类标签，全是"使用 X 之前必须先调用 Y"式诱导。
-- v1 在开发集上召回 95%，测试集上降到 72%，差距来自对措辞和命名风格的过拟合。
-- 误报率 0 只代表 MCPTox 的正常样本；5 条手写的合法描述全部被 v1 命中，真实误报率会更高。
+- v2 的 96.9% 是拟合覆盖率，不代表泛化；泛化参考是 v1 在测试集上的 72%。
+- 在真实描述上，误报来自合法的跨工具前置条件和参数说明，正则在句法上无法区分。
 
-结论：静态规则适合作为低成本的初筛，不能单独作为防线；TOFU 指纹和默认拒绝的 policy 才是主要防线。完整报告见 [docs/eval/detection-report.md](docs/eval/detection-report.md)。
+结论：静态规则适合作为低成本、可解释的初筛（建议 `on_hit: warn`），区分意图交给可选的 LLM 语义检测；TOFU 指纹和默认拒绝的 policy 仍是主要防线。完整报告见 [docs/eval/detection-report-v2.md](docs/eval/detection-report-v2.md)（图表版 [HTML](docs/eval/detection-report-v2.html)）。
+
+### LLM 语义检测（可选，默认关闭）
+
+`inspect.semantic` 把 tool 定义交给任意 OpenAI 兼容的 Chat Completions 端点（Ollama、vLLM、LM Studio 等）判定是否投毒：
+
+- **只在 tool 首次出现或定义变化时调用模型**，判定按定义摘要缓存，和 TOFU 指纹的触发时机一致。
+- **两类失败分开处置**：服务不可用默认放行并告警（`on_unavailable: warn`）；输出不合法默认剥离（`on_invalid_output: deny`），因为投毒描述可能故意把裁判输出带歪。
+- **防裁判被注入**：待测定义包在随机 nonce 标签里，输出强制为固定 JSON 并严格校验，请求不带任何工具和 secret；正则独立运行，LLM 判 benign 也撤销不了正则命中。
+- API key 只从环境变量读取（`api_key_env`），配置里不允许出现 key 本身。
+
+配置示例见 [`examples/config.example.yaml`](examples/config.example.yaml)。真实模型上的效果尚未评测，评测命令见报告末尾。
 
 ## 非目标
 
 - 不实现业务 MCP Server，只代理已有的。
-- 不做模型侧防护：不改 system prompt，不用 LLM 分类器。
-- 不提供 UI、不依赖云服务、不上传遥测。
+- 不做模型侧防护：不改 system prompt。LLM 语义检测是可选能力，默认关闭，核心链路保持确定性。
+- 不提供 UI、不依赖云服务、不上传遥测。语义检测只连接你自己配置的端点。
 - 不保证拦截所有 prompt injection。
 - 不做容器或沙箱隔离（见 docker/mcp-gateway、toolhive）。
 - 不聚合多个 Server：一个进程只代理一个 Server。
@@ -315,12 +327,13 @@ uv pip install -e '.[dev]'
 | `proxy.py` | stdio 双向转发、id 记账、子进程管理 |
 | `fingerprint.py` | TOFU 指纹（sqlite）与快照 |
 | `static_checks.py` | 投毒静态规则 |
+| `semantic.py` | 可选的 LLM 语义投毒检测（OpenAI 兼容接口） |
 | `policy.py` | 权限规则求值 |
 | `redact.py` | 双向脱敏 |
 | `audit.py` | JSONL 审计与 `guard.log` |
 | `config.py` / `types.py` | 配置解析、严格校验、数据类型 |
 | `cli.py` | 命令行入口与子命令 |
-| `eval/` | 离线评测：MCPTox 下载与解析、固定切分、规则评测 runner |
+| `eval/` | 离线评测：MCPTox 与真实样本集、固定切分、正则与 LLM 评测 runner、报告生成 |
 
 `tests/harness/replay.py` 用固定的 `initialize` / `tools/list` / `tools/call` 序列做 wire 层回放：直连 Server 和经过网关的响应字节必须一致。
 
@@ -333,7 +346,10 @@ uv pip install -e '.[dev]'
 - [ ] 单行超长消息（10 MB 级）压力测试与超时评估
 - [ ] HTTP/SSE transport（需先解决 OAuth resource identity）
 - [ ] 适配 MCP `2026-07-28` 无状态模型
-- [x] 静态检测离线评测（MCPTox）与规则迭代，见 [评测报告](docs/eval/detection-report.md)
+- [x] 静态检测离线评测（MCPTox + GitHub 真实描述）与规则迭代（v1 / v2），见 [评测报告](docs/eval/detection-report-v2.md)
+- [x] 可选的 LLM 语义投毒检测（OpenAI 兼容接口）
+- [ ] LLM 语义检测在本地模型上的真实评测
+- [ ] 多 Server 真实样本导出（`eval/corpus/export_benign.py`，需在隔离环境运行）
 - [ ] 会话级污点策略，应对 tool result 间接注入
 
 ## License

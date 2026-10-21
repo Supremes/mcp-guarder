@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mcp-guarder 投毒检测评测报告 v2</title>
+<style>
+.viz-root {
+  color-scheme: light;
+  --surface-1: #fcfcfb; --surface-2: #f3f2ef; --border: #e2e1dc;
+  --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #7a7973;
+  --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) .viz-root {
+    color-scheme: dark;
+    --surface-1: #1a1a19; --surface-2: #232321; --border: #3a3a37;
+    --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e86;
+    --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70;
+  }
+}
+:root[data-theme="dark"] .viz-root {
+  color-scheme: dark;
+  --surface-1: #1a1a19; --surface-2: #232321; --border: #3a3a37;
+  --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e86;
+  --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70;
+}
+body { margin: 0; }
+.viz-root { background: var(--surface-1); color: var(--text-primary); min-height: 100vh;
+  font: 15px/1.6 -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif; }
+main { max-width: 960px; margin: 0 auto; padding: 32px 24px 64px; }
+h1 { font-size: 26px; margin: 0 0 4px; } h2 { font-size: 19px; margin: 40px 0 12px; }
+.meta, small, figcaption span, .muted { color: var(--text-muted); }
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 24px 0; }
+.tile { background: var(--surface-2); border-radius: 8px; padding: 14px 16px; }
+.tile .big { font-size: 28px; font-weight: 600; }
+.tile div:not(.big) { color: var(--text-secondary); }
+figure { margin: 16px 0 28px; }
+figcaption { display: flex; flex-direction: column; margin-bottom: 6px; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 6px 0 8px; color: var(--text-secondary); font-size: 13px; }
+.key { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.chart { width: 100%; height: auto; font-size: 12px; }
+.grid { stroke: var(--border); stroke-width: 1; }
+.tick, .label { fill: var(--text-secondary); }
+.group { fill: var(--text-primary); font-weight: 600; font-size: 13px; }
+.value { fill: var(--text-primary); }
+.muted { fill: var(--text-muted); }
+.ci { stroke: var(--text-primary); stroke-width: 1.5; opacity: .55; }
+.hit { fill: transparent; }
+.zero { stroke-width: 3; }
+.zero.s1 { stroke: var(--series-1); } .zero.s2 { stroke: var(--series-2); } .zero.s3 { stroke: var(--series-3); }
+.mark:hover .bar, .mark:focus .bar { opacity: .85; }
+.mark:focus { outline: none; }
+.s1 { fill: var(--series-1); background: var(--series-1); }
+.s2 { fill: var(--series-2); background: var(--series-2); }
+.s3 { fill: var(--series-3); background: var(--series-3); }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; margin: 8px 0; }
+th, td { border-bottom: 1px solid var(--border); padding: 6px 8px; text-align: left; vertical-align: top; }
+th { color: var(--text-secondary); font-weight: 600; }
+pre { background: var(--surface-2); padding: 12px 14px; border-radius: 8px; overflow-x: auto; font-size: 13px; }
+.callout { background: var(--surface-2); border-left: 3px solid var(--series-2); padding: 10px 14px; border-radius: 4px; }
+ul { padding-left: 20px; }
+#tip { position: fixed; pointer-events: none; background: var(--text-primary); color: var(--surface-1);
+  padding: 6px 10px; border-radius: 6px; font-size: 12.5px; max-width: 360px; opacity: 0; transition: opacity .08s; }
+.toggle { float: right; background: var(--surface-2); color: var(--text-secondary); border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+@media (max-width: 720px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<div class="viz-root">
+<main>
+<button class="toggle" onclick="const r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'">切换深色 / 浅色</button>
+<h1>mcp-guarder 投毒检测评测报告 v2</h1>
+<div class="meta">生成于 2026-10-21 · 数据：MCPTox @ f85189f，github-mcp-server @ e3809fe · 配套文字版：detection-report-v2.md</div>
+
+<div class="tiles"><div class="tile"><div class="big">96.9%</div><div>v2 · MCPTox 覆盖率</div><small>470/485，拟合口径</small></div><div class="tile"><div class="big">72.0%</div><div>v1 · 测试集召回</div><small>149/207，泛化参考</small></div><div class="tile"><div class="big">2.1%</div><div>v2 · GitHub 误报率</div><small>3/141，留出集</small></div><div class="tile"><div class="big">459</div><div>测试用例全部通过</div><small>失败 0 · 错误 0</small></div></div>
+
+<h2>结论</h2>
+<ul>
+<li><b>正则覆盖了 MCPTox 的已知写法，但这不等于泛化。</b>v2 用 MCPTox 全量编写，覆盖率只能当拟合指标；真正的泛化参考仍是 v1 在测试集上的 72%。</li>
+<li><b>真实描述上的误报开始出现。</b>GitHub 141 个真实工具上，v1 误报 2 条，v2 误报 3 条（2.1%），全部是合法的跨工具前置条件或参数说明，正则在句法上无法区分。</li>
+<li><b>LLM 语义检测已实现并完成无模型验证。</b>默认关闭，走 OpenAI 兼容接口，按定义摘要缓存，失败分两类处置；真实模型效果待你手动评测。</li>
+<li><b>建议组合：</b>v2 正则以 <code>warn</code> 模式做低成本初筛，LLM 语义检测负责剥离；正则命中但 LLM 判 benign 的条目进入人工 review。</li>
+</ul>
+
+<h2>正则规则：召回与误报</h2>
+<figure><figcaption><b>MCPTox 投毒召回率</b><span>测试集是泛化参考；v2 用全量数据编写，只能报告拟合覆盖率</span></figcaption><div class="legend"><span class="key"><i class="sw s1"></i>开发集</span><span class="key"><i class="sw s2"></i>测试集（留出）</span><span class="key"><i class="sw s3"></i>全量覆盖（拟合）</span></div><svg viewBox="0 0 760 348" role="img" aria-label="MCPTox 投毒召回率" class="chart"><line x1="150.0" y1="8" x2="150.0" y2="326" class="grid"/><text x="150.0" y="342" class="tick" text-anchor="middle">0%</text><line x1="265.0" y1="8" x2="265.0" y2="326" class="grid"/><text x="265.0" y="342" class="tick" text-anchor="middle">25%</text><line x1="380.0" y1="8" x2="380.0" y2="326" class="grid"/><text x="380.0" y="342" class="tick" text-anchor="middle">50%</text><line x1="495.0" y1="8" x2="495.0" y2="326" class="grid"/><text x="495.0" y="342" class="tick" text-anchor="middle">75%</text><line x1="610.0" y1="8" x2="610.0" y2="326" class="grid"/><text x="610.0" y="342" class="tick" text-anchor="middle">100%</text><text x="0" y="22" class="group">v0 内置 7 条</text><g class="mark" tabindex="0" data-tip="v0 内置 7 条 · 开发集：20/278 = 7.2%（95% CI 4.7–10.8%）"><rect x="150" y="31" width="460" height="16" class="hit"/><path d="M150,32 h29.1 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-29.1 z" class="bar s1"/><line x1="171.7" y1="39.0" x2="199.9" y2="39.0" class="ci"/><line x1="171.7" y1="35.0" x2="171.7" y2="43.0" class="ci"/><line x1="199.9" y1="35.0" x2="199.9" y2="43.0" class="ci"/><text x="618" y="43.0" class="value">20/278 · 7.2%</text></g><text x="142" y="43.0" class="label" text-anchor="end">开发集</text><g class="mark" tabindex="0" data-tip="v0 内置 7 条 · 测试集：2/207 = 1.0%（95% CI 0.3–3.5%）"><rect x="150" y="53" width="460" height="16" class="hit"/><rect x="150" y="54" width="4.5" height="14" class="bar s2"/><line x1="151.2" y1="61.0" x2="165.9" y2="61.0" class="ci"/><line x1="151.2" y1="57.0" x2="151.2" y2="65.0" class="ci"/><line x1="165.9" y1="57.0" x2="165.9" y2="65.0" class="ci"/><text x="618" y="65.0" class="value">2/207 · 1.0%</text></g><text x="142" y="65.0" class="label" text-anchor="end">测试集</text><g class="mark" tabindex="0" data-tip="v0 内置 7 条 · 全量覆盖：22/485 = 4.5%（95% CI 3.0–6.8%）"><rect x="150" y="75" width="460" height="16" class="hit"/><path d="M150,76 h16.9 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-16.9 z" class="bar s3"/><line x1="163.8" y1="83.0" x2="181.1" y2="83.0" class="ci"/><line x1="163.8" y1="79.0" x2="163.8" y2="87.0" class="ci"/><line x1="181.1" y1="79.0" x2="181.1" y2="87.0" class="ci"/><text x="618" y="87.0" class="value">22/485 · 4.5%</text></g><text x="142" y="87.0" class="label" text-anchor="end">全量覆盖</text><text x="0" y="126" class="group">v1 结构规则 19 条</text><g class="mark" tabindex="0" data-tip="v1 结构规则 19 条 · 开发集：265/278 = 95.3%（95% CI 92.2–97.2%）"><rect x="150" y="135" width="460" height="16" class="hit"/><path d="M150,136 h434.5 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-434.5 z" class="bar s1"/><line x1="573.9" y1="143.0" x2="597.4" y2="143.0" class="ci"/><line x1="573.9" y1="139.0" x2="573.9" y2="147.0" class="ci"/><line x1="597.4" y1="139.0" x2="597.4" y2="147.0" class="ci"/><text x="618" y="147.0" class="value">265/278 · 95.3%</text></g><text x="142" y="147.0" class="label" text-anchor="end">开发集</text><g class="mark" tabindex="0" data-tip="v1 结构规则 19 条 · 测试集：149/207 = 72.0%（95% CI 65.5–77.7%）"><rect x="150" y="157" width="460" height="16" class="hit"/><path d="M150,158 h327.1 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-327.1 z" class="bar s2"/><line x1="451.3" y1="165.0" x2="507.2" y2="165.0" class="ci"/><line x1="451.3" y1="161.0" x2="451.3" y2="169.0" class="ci"/><line x1="507.2" y1="161.0" x2="507.2" y2="169.0" class="ci"/><text x="618" y="169.0" class="value">149/207 · 72.0%</text></g><text x="142" y="169.0" class="label" text-anchor="end">测试集</text><g class="mark" tabindex="0" data-tip="v1 结构规则 19 条 · 全量覆盖：414/485 = 85.4%（95% CI 81.9–88.2%）"><rect x="150" y="179" width="460" height="16" class="hit"/><path d="M150,180 h388.7 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-388.7 z" class="bar s3"/><line x1="526.9" y1="187.0" x2="555.9" y2="187.0" class="ci"/><line x1="526.9" y1="183.0" x2="526.9" y2="191.0" class="ci"/><line x1="555.9" y1="183.0" x2="555.9" y2="191.0" class="ci"/><text x="618" y="191.0" class="value">414/485 · 85.4%</text></g><text x="142" y="191.0" class="label" text-anchor="end">全量覆盖</text><text x="0" y="230" class="group">v2 扩充规则 31 条</text><g class="mark" tabindex="0" data-tip="v2 扩充规则 31 条 · 开发集：271/278 = 97.5%（95% CI 94.9–98.8%）"><rect x="150" y="239" width="460" height="16" class="hit"/><path d="M150,240 h444.4 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-444.4 z" class="bar s1"/><line x1="586.5" y1="247.0" x2="604.4" y2="247.0" class="ci"/><line x1="586.5" y1="243.0" x2="586.5" y2="251.0" class="ci"/><line x1="604.4" y1="243.0" x2="604.4" y2="251.0" class="ci"/><text x="618" y="251.0" class="value">271/278 · 97.5%</text></g><text x="142" y="251.0" class="label" text-anchor="end">开发集</text><text x="154" y="273.0" class="muted">测试集已用于编写规则，不再评测</text><text x="142" y="273.0" class="label" text-anchor="end">测试集</text><g class="mark" tabindex="0" data-tip="v2 扩充规则 31 条 · 全量覆盖：470/485 = 96.9%（95% CI 95.0–98.1%） · 拟合"><rect x="150" y="283" width="460" height="16" class="hit"/><path d="M150,284 h441.8 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-441.8 z" class="bar s3"/><line x1="586.8" y1="291.0" x2="601.4" y2="291.0" class="ci"/><line x1="586.8" y1="287.0" x2="586.8" y2="295.0" class="ci"/><line x1="601.4" y1="287.0" x2="601.4" y2="295.0" class="ci"/><text x="618" y="295.0" class="value">470/485 · 96.9% · 拟合</text></g><text x="142" y="295.0" class="label" text-anchor="end">全量覆盖</text></svg></figure>
+<figure><figcaption><b>正常描述误报率</b><span>GitHub 快照为留出集，每个版本只跑一次；手写探测集刻意挑了易误报写法</span></figcaption><div class="legend"><span class="key"><i class="sw s1"></i>v0 内置 7 条</span><span class="key"><i class="sw s2"></i>v1 结构规则 19 条</span><span class="key"><i class="sw s3"></i>v2 扩充规则 31 条</span></div><svg viewBox="0 0 760 348" role="img" aria-label="正常描述误报率" class="chart"><line x1="150.0" y1="8" x2="150.0" y2="326" class="grid"/><text x="150.0" y="342" class="tick" text-anchor="middle">0%</text><line x1="265.0" y1="8" x2="265.0" y2="326" class="grid"/><text x="265.0" y="342" class="tick" text-anchor="middle">15%</text><line x1="380.0" y1="8" x2="380.0" y2="326" class="grid"/><text x="380.0" y="342" class="tick" text-anchor="middle">30%</text><line x1="495.0" y1="8" x2="495.0" y2="326" class="grid"/><text x="495.0" y="342" class="tick" text-anchor="middle">45%</text><line x1="610.0" y1="8" x2="610.0" y2="326" class="grid"/><text x="610.0" y="342" class="tick" text-anchor="middle">60%</text><text x="0" y="22" class="group">MCPTox 正常（开发集）</text><g class="mark" tabindex="0" data-tip="MCPTox 正常（开发集） · v0 内置 7 条：0/230 = 0.0%（95% CI 0.0–1.6%）"><rect x="150" y="31" width="460" height="16" class="hit"/><line x1="150" y1="32" x2="150" y2="46" class="zero s1"/><line x1="150.0" y1="39.0" x2="162.6" y2="39.0" class="ci"/><line x1="150.0" y1="35.0" x2="150.0" y2="43.0" class="ci"/><line x1="162.6" y1="35.0" x2="162.6" y2="43.0" class="ci"/><text x="618" y="43.0" class="value">0/230 · 0.0%</text></g><text x="142" y="43.0" class="label" text-anchor="end">v0 内置 7 条</text><g class="mark" tabindex="0" data-tip="MCPTox 正常（开发集） · v1 结构规则 19 条：0/230 = 0.0%（95% CI 0.0–1.6%）"><rect x="150" y="53" width="460" height="16" class="hit"/><line x1="150" y1="54" x2="150" y2="68" class="zero s2"/><line x1="150.0" y1="61.0" x2="162.6" y2="61.0" class="ci"/><line x1="150.0" y1="57.0" x2="150.0" y2="65.0" class="ci"/><line x1="162.6" y1="57.0" x2="162.6" y2="65.0" class="ci"/><text x="618" y="65.0" class="value">0/230 · 0.0%</text></g><text x="142" y="65.0" class="label" text-anchor="end">v1 结构规则 19 条</text><g class="mark" tabindex="0" data-tip="MCPTox 正常（开发集） · v2 扩充规则 31 条：0/230 = 0.0%（95% CI 0.0–1.6%）"><rect x="150" y="75" width="460" height="16" class="hit"/><line x1="150" y1="76" x2="150" y2="90" class="zero s3"/><line x1="150.0" y1="83.0" x2="162.6" y2="83.0" class="ci"/><line x1="150.0" y1="79.0" x2="150.0" y2="87.0" class="ci"/><line x1="162.6" y1="79.0" x2="162.6" y2="87.0" class="ci"/><text x="618" y="87.0" class="value">0/230 · 0.0%</text></g><text x="142" y="87.0" class="label" text-anchor="end">v2 扩充规则 31 条</text><text x="0" y="126" class="group">GitHub 真实描述（留出）</text><g class="mark" tabindex="0" data-tip="GitHub 真实描述（留出） · v0 内置 7 条：0/141 = 0.0%（95% CI 0.0–2.6%）"><rect x="150" y="135" width="460" height="16" class="hit"/><line x1="150" y1="136" x2="150" y2="150" class="zero s1"/><line x1="150.0" y1="143.0" x2="170.3" y2="143.0" class="ci"/><line x1="150.0" y1="139.0" x2="150.0" y2="147.0" class="ci"/><line x1="170.3" y1="139.0" x2="170.3" y2="147.0" class="ci"/><text x="618" y="147.0" class="value">0/141 · 0.0%</text></g><text x="142" y="147.0" class="label" text-anchor="end">v0 内置 7 条</text><g class="mark" tabindex="0" data-tip="GitHub 真实描述（留出） · v1 结构规则 19 条：2/141 = 1.4%（95% CI 0.4–5.0%）"><rect x="150" y="157" width="460" height="16" class="hit"/><path d="M150,158 h6.9 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-6.9 z" class="bar s2"/><line x1="153.0" y1="165.0" x2="188.5" y2="165.0" class="ci"/><line x1="153.0" y1="161.0" x2="153.0" y2="169.0" class="ci"/><line x1="188.5" y1="161.0" x2="188.5" y2="169.0" class="ci"/><text x="618" y="169.0" class="value">2/141 · 1.4%</text></g><text x="142" y="169.0" class="label" text-anchor="end">v1 结构规则 19 条</text><g class="mark" tabindex="0" data-tip="GitHub 真实描述（留出） · v2 扩充规则 31 条：3/141 = 2.1%（95% CI 0.7–6.1%）"><rect x="150" y="179" width="460" height="16" class="hit"/><path d="M150,180 h12.3 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-12.3 z" class="bar s3"/><line x1="155.6" y1="187.0" x2="196.5" y2="187.0" class="ci"/><line x1="155.6" y1="183.0" x2="155.6" y2="191.0" class="ci"/><line x1="196.5" y1="183.0" x2="196.5" y2="191.0" class="ci"/><text x="618" y="191.0" class="value">3/141 · 2.1%</text></g><text x="142" y="191.0" class="label" text-anchor="end">v2 扩充规则 31 条</text><text x="0" y="230" class="group">手写合法描述</text><g class="mark" tabindex="0" data-tip="手写合法描述 · v0 内置 7 条：1/30 = 3.3%（95% CI 0.6–16.7%）"><rect x="150" y="239" width="460" height="16" class="hit"/><path d="M150,240 h21.5 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-21.5 z" class="bar s1"/><line x1="154.5" y1="247.0" x2="277.8" y2="247.0" class="ci"/><line x1="154.5" y1="243.0" x2="154.5" y2="251.0" class="ci"/><line x1="277.8" y1="243.0" x2="277.8" y2="251.0" class="ci"/><text x="618" y="251.0" class="value">1/30 · 3.3%</text></g><text x="142" y="251.0" class="label" text-anchor="end">v0 内置 7 条</text><g class="mark" tabindex="0" data-tip="手写合法描述 · v1 结构规则 19 条：9/30 = 30.0%（95% CI 16.7–47.9%）"><rect x="150" y="261" width="460" height="16" class="hit"/><path d="M150,262 h226.0 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-226.0 z" class="bar s2"/><line x1="277.7" y1="269.0" x2="517.1" y2="269.0" class="ci"/><line x1="277.7" y1="265.0" x2="277.7" y2="273.0" class="ci"/><line x1="517.1" y1="265.0" x2="517.1" y2="273.0" class="ci"/><text x="618" y="273.0" class="value">9/30 · 30.0%</text></g><text x="142" y="273.0" class="label" text-anchor="end">v1 结构规则 19 条</text><g class="mark" tabindex="0" data-tip="手写合法描述 · v2 扩充规则 31 条：10/30 = 33.3%（95% CI 19.2–51.2%）"><rect x="150" y="283" width="460" height="16" class="hit"/><path d="M150,284 h251.5 a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-251.5 z" class="bar s3"/><line x1="297.4" y1="291.0" x2="542.7" y2="291.0" class="ci"/><line x1="297.4" y1="287.0" x2="297.4" y2="295.0" class="ci"/><line x1="542.7" y1="287.0" x2="542.7" y2="295.0" class="ci"/><text x="618" y="295.0" class="value">10/30 · 33.3%</text></g><text x="142" y="295.0" class="label" text-anchor="end">v2 扩充规则 31 条</text></svg></figure>
+
+<h2>LLM 语义检测</h2>
+<p class="callout"><b>待你手动触发。</b>本机没有本地模型，LLM 检测的真实效果尚未评测。代码、单元测试和评测链路自检均已完成；跑完下面的命令后重新生成本页即可。</p><pre>.venv/bin/python -m eval.run_semantic --base-url http://localhost:11434/v1 \
+    --model &lt;模型&gt; --tag &lt;标签&gt; --split dev --limit 20   # 冒烟
+.venv/bin/python -m eval.run_semantic ... --split dev          # 调 prompt 用
+.venv/bin/python -m eval.run_semantic ... --split test         # 冻结后只跑一次
+.venv/bin/python -m eval.run_semantic ... --split benign       # 冻结后只跑一次
+.venv/bin/python -m eval.report_html</pre>
+
+<h2>验证</h2>
+<p>评测链路自检：本地假 OpenAI 服务用 v2 正则作答，评测 runner 必须复现出和直接跑正则完全相同的数字。</p>
+<table><thead><tr><th>检查项</th><th>结果</th></tr></thead><tbody><tr><td>✅ oracle-dev</td><td>runner 271/278, FP 0/230 = regex 271/278, FP 0/230</td></tr><tr><td>✅ oracle-benign</td><td>runner 0/0, FP 3/141 = regex 0/0, FP 3/141</td></tr><tr><td>✅ oracle-probes</td><td>runner 7/8, FP 10/30 = regex 7/8, FP 10/30</td></tr><tr><td>✅ invalid-output-accounting</td><td>180 条不合法 + 328 条已判定 = 508 条样本</td></tr></tbody></table>
+<p>单元测试（按模块）：</p>
+<table><thead><tr><th>模块</th><th>用例数</th></tr></thead><tbody><tr><td>test_audit</td><td>50</td></tr><tr><td>test_config</td><td>112</td></tr><tr><td>test_fingerprint</td><td>50</td></tr><tr><td>test_policy</td><td>47</td></tr><tr><td>test_proxy</td><td>49</td></tr><tr><td>test_redact</td><td>53</td></tr><tr><td>test_semantic</td><td>51</td></tr><tr><td>test_static_checks</td><td>47</td></tr></tbody></table>
+
+<h2>明细数据</h2>
+<table><thead><tr><th>规则 / 样本集</th><th>召回</th><th>召回率</th><th>95% CI</th><th>误报</th><th>误报 95% CI</th></tr></thead>
+<tbody><tr><td>v0 / dev</td><td>20/278</td><td>7.2%</td><td>4.7–10.8%</td><td>0/230 · 0.0%</td><td>0.0–1.6%</td></tr><tr><td>v0 / test</td><td>2/207</td><td>1.0%</td><td>0.3–3.5%</td><td>0/132 · 0.0%</td><td>0.0–2.8%</td></tr><tr><td>v0 / mcptox-all</td><td>22/485</td><td>4.5%</td><td>3.0–6.8%</td><td>0/362 · 0.0%</td><td>0.0–1.1%</td></tr><tr><td>v0 / benign</td><td>—</td><td>—</td><td>—</td><td>0/141 · 0.0%</td><td>0.0–2.6%</td></tr><tr><td>v0 / probes</td><td>1/8</td><td>12.5%</td><td>2.2–47.1%</td><td>1/30 · 3.3%</td><td>0.6–16.7%</td></tr><tr><td>v1 / dev</td><td>265/278</td><td>95.3%</td><td>92.2–97.2%</td><td>0/230 · 0.0%</td><td>0.0–1.6%</td></tr><tr><td>v1 / test</td><td>149/207</td><td>72.0%</td><td>65.5–77.7%</td><td>0/132 · 0.0%</td><td>0.0–2.8%</td></tr><tr><td>v1 / mcptox-all</td><td>414/485</td><td>85.4%</td><td>81.9–88.2%</td><td>0/362 · 0.0%</td><td>0.0–1.1%</td></tr><tr><td>v1 / benign</td><td>—</td><td>—</td><td>—</td><td>2/141 · 1.4%</td><td>0.4–5.0%</td></tr><tr><td>v1 / probes</td><td>3/8</td><td>37.5%</td><td>13.7–69.4%</td><td>9/30 · 30.0%</td><td>16.7–47.9%</td></tr><tr><td>v2 / dev</td><td>271/278</td><td>97.5%</td><td>94.9–98.8%</td><td>0/230 · 0.0%</td><td>0.0–1.6%</td></tr><tr><td>v2 / mcptox-all</td><td>470/485</td><td>96.9%</td><td>95.0–98.1%</td><td>0/362 · 0.0%</td><td>0.0–1.1%</td></tr><tr><td>v2 / benign</td><td>—</td><td>—</td><td>—</td><td>3/141 · 2.1%</td><td>0.7–6.1%</td></tr><tr><td>v2 / probes</td><td>7/8</td><td>87.5%</td><td>52.9–97.8%</td><td>10/30 · 33.3%</td><td>19.2–51.2%</td></tr></tbody></table>
+<p class="meta">所有比例都附原始计数和 Wilson 95% 置信区间。留出集（test、benign）每个规则版本只运行一次。</p>
+</main>
+<div id="tip" role="tooltip"></div>
+</div>
+<script>
+const tip = document.getElementById('tip');
+function show(e, el) {
+  tip.textContent = el.dataset.tip; tip.style.opacity = 1;
+  const r = el.getBoundingClientRect();
+  const x = e && e.clientX ? e.clientX : r.left + r.width / 2;
+  const y = e && e.clientY ? e.clientY : r.top;
+  tip.style.left = Math.min(x + 12, window.innerWidth - 380) + 'px';
+  tip.style.top = (y + 14) + 'px';
+}
+document.querySelectorAll('.mark').forEach(el => {
+  el.addEventListener('mousemove', e => show(e, el));
+  el.addEventListener('focus', () => show(null, el));
+  el.addEventListener('mouseleave', () => tip.style.opacity = 0);
+  el.addEventListener('blur', () => tip.style.opacity = 0);
+});
+</script>
+</body>
+</html>
