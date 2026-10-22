@@ -1,7 +1,7 @@
 """LLM 评测链路自检：不需要真实模型。
 
-起一个本地假 OpenAI 服务，它用 v2 正则给出判定；然后用 ``eval.run_semantic`` 的同一套代码
-跑一遍。如果算出来的召回率 / 误报率和直接跑 v2 正则完全一致，就说明
+起一个本地假 OpenAI 服务，它用内置正则给出判定（任一规则命中即判投毒，不区分 deny / warn）；
+然后用 ``eval.run_semantic`` 的同一套代码跑一遍。如果算出来的召回率 / 误报率和直接跑正则完全一致，就说明
 "拼请求 → HTTP → 解析 → 按样本对齐 → 统计"这条链路是对的。再注入一批不合法输出，
 确认错误被单独计数、部署口径按默认配置处理。用法::
 
@@ -19,11 +19,11 @@ from typing import Any
 
 from eval.datasets import get_samples
 from eval.run_semantic import run, summarize
-from eval.run_static import RESULTS_DIR, build_config, evaluate
+from eval.run_static import BUILTIN, RESULTS_DIR, build_config, evaluate
 from mcp_guarder import static_checks
 from mcp_guarder.types import SemanticConfig
 
-RULES = "v2"
+RULES = BUILTIN
 
 
 def start_oracle(*, garbage_every: int = 0) -> tuple[ThreadingHTTPServer, str]:
@@ -68,7 +68,7 @@ def check(split: str, *, garbage_every: int = 0) -> dict[str, Any]:
     samples, _ = get_samples(split)
     httpd, base_url = start_oracle(garbage_every=garbage_every)
     try:
-        config = SemanticConfig(enabled=True, base_url=base_url, model="oracle-v2",
+        config = SemanticConfig(enabled=True, base_url=base_url, model="oracle-regex",
                                 timeout_s=30, max_tools_per_request=8)
         result = summarize(samples, run(samples, config, progress=False))
     finally:

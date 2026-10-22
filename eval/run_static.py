@@ -1,15 +1,16 @@
-"""用指定规则版本跑静态检测，输出带分母的指标（docs/detection-eval-spec.md §5–§6）。
+"""跑静态检测评测，输出带分母的指标（docs/detection-eval-spec.md §5–§6）。
 
 用法::
 
-    .venv/bin/python -m eval.run_static --rules v0 --split dev
-    .venv/bin/python -m eval.run_static --rules v1 --split test
+    .venv/bin/python -m eval.run_static --split dev                       # 内置规则
+    .venv/bin/python -m eval.run_static --rules my-rules.yaml --split dev # 实验用规则文件
 
-- ``v0``：内置默认规则（``types.SPEC_STATIC_RULES``），不做修改。
-- 其他版本：读 ``eval/rules/<version>.yaml``（``{id, pattern}`` 列表）。
-- 留出集（``test``、``benign``）**每个规则版本只跑一次**：结果文件已存在就拒绝运行。改了规则就是新版本。
+- ``builtin``（默认）：内置规则（``types.SPEC_STATIC_RULES``），每条自带 deny / warn。
+- 其他：一个 YAML 文件，格式和配置里的 ``inspect.static_checks.rules`` 相同。
+- 留出集（``test``、``benign``）**同一套正则只跑一次**：按 id + pattern 的摘要查已有结果，
+  不看名字。只改 deny / warn 不算新规则，deny 层可以用已有结果里的逐条命中重算。
 
-结果写到 ``eval/results/<rules>-<split>.json``，只有统计和样本 ID，不含 MCPTox 原文。
+结果写到 ``eval/results/<规则名>-<split>.json``，只有统计和样本 ID，不含 MCPTox 原文。
 """
 
 from __future__ import annotations
@@ -36,23 +37,36 @@ from mcp_guarder import static_checks
 from mcp_guarder.types import StaticCheckAction, StaticChecksConfig
 
 EVAL_DIR = Path(__file__).resolve().parent
-RULES_DIR = EVAL_DIR / "rules"
 RESULTS_DIR = EVAL_DIR / "results"
-#: 留出集：规则冻结后每个版本只跑一次（test 测召回，benign 测真实误报）。
+#: 留出集：同一套正则只跑一次（test 测召回，benign 测真实误报）。
 HELD_OUT = ("test", "benign")
+BUILTIN = "builtin"
 
 
-def build_config(version: str) -> tuple[StaticChecksConfig, str]:
+def rules_label(rules: str) -> str:
+    return rules if rules == BUILTIN else Path(rules).stem
+
+
+def build_config(rules: str = BUILTIN) -> tuple[StaticChecksConfig, str]:
     """返回 (静态检查配置, 规则摘要)。正则编译走 mcp-guarder 自己的配置解析。"""
     raw: dict[str, Any] = {"version": 1, "server": {"name": "eval", "transport": "stdio"}}
-    if version != "v0":
-        rules = yaml.safe_load((RULES_DIR / f"{version}.yaml").read_text(encoding="utf-8"))
-        raw["inspect"] = {"static_checks": {"rules": rules}}
+    if rules != BUILTIN:
+        loaded = yaml.safe_load(Path(rules).read_text(encoding="utf-8"))
+        raw["inspect"] = {"static_checks": {"rules": loaded}}
     cfg = config_mod.parse_config(raw).inspect.static_checks
     digest = hashlib.sha256(
         json.dumps([(r.id, r.pattern) for r in cfg.rules]).encode()
     ).hexdigest()
     return cfg, digest
+
+
+def held_out_run(split: str, rules_digest: str) -> Path | None:
+    """同一套正则（id + pattern 摘要相同）已经跑过这个留出集的结果文件。"""
+    for path in sorted(RESULTS_DIR.glob("*.json")):
+        meta = json.loads(path.read_text(encoding="utf-8")).get("meta", {})
+        if meta.get("split") == split and meta.get("rules_sha256") == rules_digest:
+            return path
+    return None
 
 
 def wilson(k: int, n: int, z: float = 1.96) -> list[float] | None:
@@ -154,7 +168,7 @@ def git_commit() -> str:
             ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True, cwd=EVAL_DIR.parent
         )
         dirty = subprocess.run(
-            ["git", "status", "--porcelain", "--", "src", "eval/rules", "eval/mcptox", "eval/run_static.py"],
+            ["git", "status", "--porcelain", "--", "src", "eval/mcptox", "eval/run_static.py"],
             capture_output=True, text=True, check=True, cwd=EVAL_DIR.parent,
         ).stdout.strip()
         return out.stdout.strip() + ("-dirty" if dirty else "")
@@ -164,22 +178,27 @@ def git_commit() -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="eval.run_static")
-    parser.add_argument("--rules", required=True, help="v0 或 eval/rules/ 下的版本名")
+    parser.add_argument("--rules", default=BUILTIN, help="builtin（默认）或规则 YAML 文件路径")
     parser.add_argument("--split", required=True, choices=SPLITS)
     args = parser.parse_args(argv)
 
-    out_path = RESULTS_DIR / f"{args.rules}-{args.split}.json"
-    if args.split in HELD_OUT and out_path.exists():
-        print(f"{out_path.name} already exists: {args.split} split runs once per rules version",
+    label = rules_label(args.rules)
+    out_path = RESULTS_DIR / f"{label}-{args.split}.json"
+    cfg, rules_digest = build_config(args.rules)
+    if args.split in HELD_OUT and (prior := held_out_run(args.split, rules_digest)):
+        print(f"{prior.name} already has these rules on {args.split}: held-out splits run once "
+              f"per rule set; recompute deny / warn tiers from its per-sample hits instead",
               file=sys.stderr)
         return 1
+    if out_path.exists() and args.split in HELD_OUT:
+        print(f"{out_path.name} already exists", file=sys.stderr)
+        return 1
 
-    cfg, rules_digest = build_config(args.rules)
     samples, source_meta = get_samples(args.split)
     result = evaluate(samples, cfg)
     result = {
         "meta": {
-            "rules_version": args.rules,
+            "rules_version": label,
             "rules_sha256": rules_digest,
             "rule_ids": [r.id for r in cfg.rules],
             "split": args.split,
@@ -199,13 +218,13 @@ def main(argv: list[str] | None = None) -> int:
     dl = result["deny_layer"]
     if len(dl["rule_ids"]) != len(result["meta"]["rule_ids"]):
         print(
-            f"[{args.rules}/{args.split}] deny layer: recall {dl['recall']['k']}/{dl['recall']['n']}  "
+            f"[{label}/{args.split}] deny layer: recall {dl['recall']['k']}/{dl['recall']['n']}  "
             f"FPR {dl['false_positive_rate']['k']}/{dl['false_positive_rate']['n']}",
             file=sys.stderr,
         )
     r, f = result["recall"], result["false_positive_rate"]
     print(
-        f"[{args.rules}/{args.split}] recall {r['k']}/{r['n']} ({r['rate']}, ci95 {r['ci95']})  "
+        f"[{label}/{args.split}] recall {r['k']}/{r['n']} ({r['rate']}, ci95 {r['ci95']})  "
         f"FPR {f['k']}/{f['n']} ({f['rate']}, ci95 {f['ci95']})  "
         f"scan_errors {result['counts']['scan_errors']}  -> {out_path.relative_to(EVAL_DIR.parent)}",
         file=sys.stderr,

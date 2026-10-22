@@ -1,5 +1,5 @@
 {
-  "rules": "v2",
+  "rules": "builtin",
   "passed": true,
   "checks": [
     {
