@@ -1,17 +1,17 @@
 {
-  "tests": 470,
+  "tests": 513,
   "failures": 0,
   "errors": 0,
   "skipped": 0,
   "by_module": {
     "test_audit": 50,
-    "test_config": 112,
+    "test_config": 115,
     "test_fingerprint": 50,
     "test_policy": 47,
     "test_proxy": 49,
     "test_redact": 53,
-    "test_rule_actions": 11,
+    "test_rule_actions": 24,
     "test_semantic": 51,
-    "test_static_checks": 47
+    "test_static_checks": 74
   }
 }

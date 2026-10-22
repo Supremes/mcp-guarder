@@ -1,7 +1,7 @@
 """LLM 语义投毒检测：把 tool 定义交给一个 OpenAI 兼容的 Chat Completions 接口判定。
 
 为什么需要它：静态正则只认得句法外形，"调用 X 之前先调用 Y"在合法 Server 里是使用说明，
-在恶意 Server 里是攻击 —— 区别在意图，正则分不出来（见 docs/eval/detection-report-v2.md）。
+在恶意 Server 里是攻击 —— 区别在意图，正则分不出来（见 docs/eval/detection-report.md）。
 
 设计要点：
 

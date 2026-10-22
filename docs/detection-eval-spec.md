@@ -2,7 +2,7 @@
 
 - 日期：2026-10-16
 - 分支：`feat/detection-eval`
-- 状态：A 已完成（2026-10-19）；A2 代码、无模型验证与本地 LLM 真实评测已完成（2026-10-21），见 [评测报告 v2](eval/detection-report-v2.md)；多 Server 样本导出与 B 待启动
+- 状态：A 已完成（2026-10-19）；A2 代码、无模型验证与本地 LLM 真实评测已完成（2026-10-21）；正则于 2026-10-22 合并为一套内置规则（§13），现行报告见 [detection-report.md](eval/detection-report.md)；多 Server 样本导出与 B 待启动
 - 取代：`docs/agent-execution-eval-spec.md`（已删除，评测口径并入 §7）
 
 ## 1. 为什么做
@@ -105,6 +105,7 @@ v1 的改进方向是把攻击的结构特征写成规则，而不是逐条记�
 
 - v1 先作为独立配置文件交付（`eval/rules/v1.yaml`），可以通过 `inspect.static_checks.rules` 显式启用。
 - 是否替换内置默认规则，等看完测试集的误报率再单独确认。替换会改变所有用户的运行时行为。
+- **2026-10-22 决定：替换。** 内置规则换成合并后的 31 条分层规则，`eval/rules/` 删除，见 §13。
 
 ## 6. 指标
 
@@ -171,6 +172,8 @@ docs/eval/
 - 结果 JSON 记录：代码 commit、数据 commit 与 sha256、规则版本与规则文件摘要、切分摘要、运行时间。
 - 评测脚本本身不加单元测试；loader 的对账（解析数和 `tool_names` 总数对比）作为运行时断言。
 
+> 2026-10-22 起 `eval/rules/` 已删除，`run_static` 默认跑内置规则（`--rules builtin`），留出集按正则摘要防重跑，见 §13。上面的目录和命令保留为当时的计划。
+
 ## 10. 批次与验收
 
 | 批次 | 预算 | 交付 | 验收 |
@@ -234,3 +237,12 @@ A 合计 7–12 小时。每个批次结束时汇报改动、跑过的验证、�
 - 首轮开发集因 HTTP 断流中断，未产出完整指标；修复传输层将 `HTTPException` 归为 `unavailable` 后重跑开发集。留出集不重跑，失败不改记为安全。
 - 真实 CLI 联调验证 v3 warn 规则交给 LLM、投毒工具剥离、审计，以及服务不可达时的缓存复用；见 `eval/results/omlx-qwen3.5-9b-4bit-proxy-smoke.json`。未新增单元测试；已有 62 个相关测试与评测链路自检通过。
 - 这是 LLM 分类器的离线效果，不是 v3 + LLM 组合的大规模效果，也不是 B 的 Agent 成对实验。批次 P50 / P95 为 10.28 / 13.88 秒，不能把评测的每批预算误当成运行时整个 `tools/list` 的预算；保持默认关闭。
+
+## 13. 规则合并（2026-10-22）
+
+- **决定**：正则不再分 v1 / v2 / v3，合并为一套内置规则，替换原来的 7 条（回答 §5.3）。v0–v3 只作为历史实验编号，保留在结果文件名和 [eval/history/](eval/history/) 里。
+- **内容**：31 条正则与 v2 / v3 逐字相同（id + pattern 摘要 `3d9052…`），逐样本命中一致，历史数字可以沿用。处置方式沿用 v3 的分层，唯一改动是 `read-extra-file` 从 warn 改回 deny，结果是 11 deny / 20 warn。
+- **为什么改 `read-extra-file`**：LLM 默认关闭。按 v3 原样分层，原内置规则能剥离的 22 条 MCPTox 投毒里有 19 条会退化成只告警，全是读 `~/.ssh/id_rsa` 这类典型攻击。改回 deny 后，deny 层 MCPTox 全量 101/485（v3 为 82/485），GitHub 仍是 0/141，手写合法描述误报从 0/30 变为 1/30（`ssh_config_list`）。
+- **行为变化**：不写 `rules` 的配置从 7 条全部 deny 变为 31 条分层；`base64-blob`、`cross-server-ref` 从 deny 变为 warn；内置规则的处置方式优先于段级 `on_hit`。
+- **评测脚本**：删除 `eval/rules/`；`run_static --rules` 默认 `builtin`，也接受 YAML 路径；留出集防护改为按正则摘要查重。新增 `builtin-{dev,mcptox-all,probes}.json`，留出集没有重跑；LLM 链路自检改用内置规则，结果不变。
+- **文档**：现行报告是 [detection-report.md](eval/detection-report.md)（附 HTML），v0–v3 的两份报告移到 [eval/history/](eval/history/)。

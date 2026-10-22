@@ -1,6 +1,6 @@
-"""从 ``eval/results/*.json`` 生成 HTML 评测报告：``docs/eval/detection-report-v2.html``。
+"""从 ``eval/results/*.json`` 生成 HTML 评测报告：``docs/eval/detection-report.html``。
 
-跑完本地模型评测（``eval.run_semantic``）后重新执行一次，LLM 部分会自动填上::
+配套文字版是 ``docs/eval/detection-report.md``。补充新的结果后重新执行一次::
 
     .venv/bin/python -m eval.report_html
 """
@@ -14,12 +14,17 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from eval.run_static import rate
+
 EVAL_DIR = Path(__file__).resolve().parent
 RESULTS = EVAL_DIR / "results"
-OUT = EVAL_DIR.parent / "docs" / "eval" / "detection-report-v2.html"
+OUT = EVAL_DIR.parent / "docs" / "eval" / "detection-report.html"
 
+#: 规则演进（历史实验编号）；现行内置规则的结果文件是 ``builtin-*.json``。
 VERSIONS = ("v0", "v1", "v2")
-VERSION_LABEL = {"v0": "v0 内置 7 条", "v1": "v1 结构规则 19 条", "v2": "v2 扩充规则 31 条"}
+VERSION_LABEL = {"v0": "v0 原内置 7 条", "v1": "v1 结构规则 19 条", "v2": "v2 扩充规则 31 条"}
+#: GitHub 留出集：内置规则和 v2 / v3 的正则逐字相同，沿用 v3 的逐条命中，不重跑。
+GITHUB_STATIC = "v3-benign"
 
 
 def load(name: str) -> dict[str, Any] | None:
@@ -143,8 +148,16 @@ def semantic_files() -> list[dict[str, Any]]:
     return out
 
 
+def semantic_result(split: str) -> dict[str, Any] | None:
+    """有效的 LLM 结果（跳过作废记录）。"""
+    for d in semantic_files():
+        if d["meta"]["split"] == split and d.get("validation", {}).get("valid", True):
+            return d
+    return None
+
+
 def build() -> str:
-    r = {f"{v}-{s}": load(f"{v}-{s}") for v in (*VERSIONS, "v3")
+    r = {f"{v}-{s}": load(f"{v}-{s}") for v in (*VERSIONS, "v3", "builtin")
          for s in ("dev", "test", "mcptox-all", "benign", "probes")}
     selfcheck = load("selfcheck-semantic")
     tests = load("test-summary")
@@ -154,9 +167,73 @@ def build() -> str:
         data = r.get(key)
         return data[metric] if data else None
 
-    recall_chart = bar_chart(
-        "MCPTox 投毒召回率",
-        "测试集是泛化参考；v2 用全量数据编写，只能报告拟合覆盖率",
+    def dl(key: str, metric: str) -> dict[str, Any] | None:
+        data = r.get(key)
+        return data["deny_layer"][metric] if data and "deny_layer" in data else None
+
+    def sm(split: str, metric: str) -> dict[str, Any] | None:
+        data = semantic_result(split)
+        return data[metric] if data else None
+
+    # GitHub 的 deny 层：按现行内置规则的 deny 集合，从已有逐条命中重算。
+    builtin_all = r.get("builtin-mcptox-all")
+    deny_ids = set(builtin_all["deny_layer"]["rule_ids"]) if builtin_all else set()
+    gh = r.get(GITHUB_STATIC)
+    gh_all = gh["false_positive_rate"] if gh else None
+    gh_deny = (
+        rate(sum(bool(set(rules) & deny_ids) for rules in gh["hits"].values()), gh["counts"]["clean"])
+        if gh and deny_ids else None
+    )
+
+    layer_chart = bar_chart(
+        "内置规则：deny 层 vs 全部命中",
+        "deny 层 11 条命中即剥离；其余 20 条只告警，开了 LLM 时交给 LLM。MCPTox 全量为拟合口径；GitHub 的 deny 层误报为非独立验证",
+        [
+            ("召回 · MCPTox 全量（拟合）", [
+                ("deny 层", 1, dl("builtin-mcptox-all", "recall"), ""),
+                ("全部命中", 2, g("builtin-mcptox-all", "recall"), ""),
+            ]),
+            ("召回 · 裁判注入样本", [
+                ("deny 层", 1, dl("builtin-probes", "recall"), ""),
+                ("全部命中", 2, g("builtin-probes", "recall"), ""),
+            ]),
+            ("误报 · GitHub 真实描述（留出）", [
+                ("deny 层", 1, gh_deny, "非独立"),
+                ("全部命中", 2, gh_all, ""),
+            ]),
+            ("误报 · 手写合法描述", [
+                ("deny 层", 1, dl("builtin-probes", "false_positive_rate"), ""),
+                ("全部命中", 2, g("builtin-probes", "false_positive_rate"), ""),
+            ]),
+        ],
+        [("deny 层（自动剥离）", 1), ("全部命中（含 warn）", 2)],
+        100,
+    )
+    llm_chart = bar_chart(
+        "LLM 语义检测 vs 内置规则",
+        "测试集召回只比较没看过测试集的检测方式：前 19 条规则（原 v1）只依据开发集编写，LLM 的 prompt 只依据开发集设计",
+        [
+            ("召回 · MCPTox 测试集（留出）", [
+                ("前 19 条规则", 2, g("v1-test", "recall"), "原 v1"),
+                ("LLM", 3, sm("test", "recall"), ""),
+            ]),
+            ("误报 · GitHub 真实描述（留出）", [
+                ("deny 层", 1, gh_deny, "非独立"),
+                ("全部命中", 2, gh_all, ""),
+                ("LLM", 3, sm("benign", "false_positive_rate"), ""),
+            ]),
+            ("误报 · 手写合法描述", [
+                ("deny 层", 1, dl("builtin-probes", "false_positive_rate"), ""),
+                ("全部命中", 2, g("builtin-probes", "false_positive_rate"), ""),
+                ("LLM", 3, sm("probes", "false_positive_rate"), ""),
+            ]),
+        ],
+        [("内置规则 deny 层", 1), ("内置规则全部命中 / 前 19 条", 2), ("本地 LLM", 3)],
+        100,
+    )
+    history_chart = bar_chart(
+        "规则演进：MCPTox 投毒召回",
+        "历史实验编号；测试集是泛化参考，v2 用全量数据编写，只能报告拟合覆盖率",
         [
             (VERSION_LABEL[v], [
                 ("开发集", 1, g(f"{v}-dev", "recall"), ""),
@@ -169,84 +246,50 @@ def build() -> str:
         [("开发集", 1), ("测试集（留出）", 2), ("全量覆盖（拟合）", 3)],
         100,
     )
-    fpr_chart = bar_chart(
-        "正常描述误报率",
-        "GitHub 快照为留出集，每个版本只跑一次；手写探测集刻意挑了易误报写法",
-        [
-            ("MCPTox 正常（开发集）", [(VERSION_LABEL[v], i + 1, g(f"{v}-dev", "false_positive_rate"), "")
-                                     for i, v in enumerate(VERSIONS)]),
-            ("GitHub 真实描述（留出）", [(VERSION_LABEL[v], i + 1, g(f"{v}-benign", "false_positive_rate"), "")
-                                       for i, v in enumerate(VERSIONS)]),
-            ("手写合法描述", [(VERSION_LABEL[v], i + 1, g(f"{v}-probes", "false_positive_rate"), "")
-                             for i, v in enumerate(VERSIONS)]),
-        ],
-        [(VERSION_LABEL[v], i + 1) for i, v in enumerate(VERSIONS)],
-        60,
-    )
-
-    def dl(key: str, metric: str) -> dict[str, Any] | None:
-        data = r.get(key)
-        return data["deny_layer"][metric] if data and "deny_layer" in data else None
-
-    layer_chart = bar_chart(
-        "v3 分层：deny 层 vs 全部命中",
-        "规则与 v2 相同；deny 层 10 条命中即剥离，其余 21 条只告警、交给 LLM。GitHub 的 deny 层误报为非独立验证：分组时参考过它",
-        [
-            ("召回 · MCPTox 全量（拟合）", [
-                ("deny 层", 1, dl("v3-mcptox-all", "recall"), ""),
-                ("全部命中", 2, g("v3-mcptox-all", "recall"), ""),
-            ]),
-            ("召回 · 裁判注入样本", [
-                ("deny 层", 1, dl("v3-probes", "recall"), ""),
-                ("全部命中", 2, g("v3-probes", "recall"), ""),
-            ]),
-            ("误报 · GitHub 真实描述", [
-                ("deny 层", 1, dl("v3-benign", "false_positive_rate"), "非独立"),
-                ("全部命中", 2, g("v3-benign", "false_positive_rate"), ""),
-            ]),
-            ("误报 · 手写合法描述", [
-                ("deny 层", 1, dl("v3-probes", "false_positive_rate"), ""),
-                ("全部命中", 2, g("v3-probes", "false_positive_rate"), ""),
-            ]),
-        ],
-        [("deny 层（自动剥离）", 1), ("全部命中（含 warn）", 2)],
-        100,
-    )
 
     def tile(value: str, label: str, sub: str) -> str:
         return f'<div class="tile"><div class="big">{esc(value)}</div><div>{esc(label)}</div><small>{esc(sub)}</small></div>'
 
     tiles = "".join([
-        tile(pct(g("v2-mcptox-all", "recall")), "v2 / v3 · MCPTox 覆盖率", f"{frac(g('v2-mcptox-all', 'recall'))}，拟合口径"),
-        tile(pct(g("v1-test", "recall")), "v1 · 测试集召回", f"{frac(g('v1-test', 'recall'))}，泛化参考"),
-        tile(pct(dl("v3-mcptox-all", "recall")), "v3 · deny 层自动剥离",
-             f"{frac(dl('v3-mcptox-all', 'recall'))}，其余交给 LLM"),
+        tile(pct(dl("builtin-mcptox-all", "recall")), "deny 层自动剥离",
+             f"MCPTox {frac(dl('builtin-mcptox-all', 'recall'))}，正常样本 0 误报"),
+        tile(pct(g("builtin-mcptox-all", "recall")), "内置规则全部命中",
+             f"{frac(g('builtin-mcptox-all', 'recall'))}，拟合口径"),
+        tile(pct(sm("test", "recall")), "本地 LLM · 测试集召回",
+             f"{frac(sm('test', 'recall'))}，GitHub 误报 {frac(sm('benign', 'false_positive_rate'))}"),
         tile(f"{tests['tests']}" if tests else "—", "测试用例全部通过",
              f"失败 {tests['failures']} · 错误 {tests['errors']}" if tests else ""),
     ])
 
     # 明细表
+    def cells(rc: dict[str, Any] | None, fp: dict[str, Any] | None) -> str:
+        return (f"<td>{frac(rc)}</td><td>{pct(rc)}</td><td>{ci(rc)}</td>"
+                f"<td>{frac(fp)} · {pct(fp)}</td><td>{ci(fp)}</td>")
+
     def row(name: str, key: str) -> str:
         d = r.get(key)
         if not d:
-            return f"<tr><td>{esc(name)}</td><td colspan=5 class=muted>未运行</td></tr>"
-        rc, fp = d["recall"], d["false_positive_rate"]
-        return (f"<tr><td>{esc(name)}</td><td>{frac(rc)}</td><td>{pct(rc)}</td><td>{ci(rc)}</td>"
-                f"<td>{frac(fp)} · {pct(fp)}</td><td>{ci(fp)}</td></tr>")
+            return ""
+        return f"<tr><td>{esc(name)}</td>{cells(d['recall'], d['false_positive_rate'])}</tr>"
 
-    def deny_row(split: str) -> str:
-        d = r.get(f"v3-{split}")
+    def deny_row(name: str, key: str) -> str:
+        d = r.get(key)
         if not d or "deny_layer" not in d:
             return ""
-        rc, fp = d["deny_layer"]["recall"], d["deny_layer"]["false_positive_rate"]
-        return (f"<tr><td>v3 deny 层 / {esc(split)}</td><td>{frac(rc)}</td><td>{pct(rc)}</td><td>{ci(rc)}</td>"
-                f"<td>{frac(fp)} · {pct(fp)}</td><td>{ci(fp)}</td></tr>")
+        return f"<tr><td>{esc(name)}</td>{cells(d['deny_layer']['recall'], d['deny_layer']['false_positive_rate'])}</tr>"
 
-    table_rows = "".join(
+    current_rows = "".join(
+        deny_row(f"deny 层 / {split}", f"builtin-{split}") + row(f"全部命中 / {split}", f"builtin-{split}")
+        for split in ("dev", "mcptox-all", "probes")
+    ) + (
+        f"<tr><td>deny 层 / benign（{GITHUB_STATIC} 重算）</td>{cells(None, gh_deny)}</tr>"
+        f"<tr><td>全部命中 / benign（{GITHUB_STATIC}）</td>{cells(None, gh_all)}</tr>"
+        if gh else ""
+    )
+    history_rows = "".join(
         row(f"{v} / {split}", f"{v}-{split}")
-        for v in VERSIONS for split in ("dev", "test", "mcptox-all", "benign", "probes")
-        if r.get(f"{v}-{split}")
-    ) + "".join(deny_row(s) for s in ("dev", "mcptox-all", "benign", "probes"))
+        for v in (*VERSIONS, "v3") for split in ("dev", "test", "mcptox-all", "benign", "probes")
+    ) + "".join(deny_row(f"v3 deny 层 / {s}", f"v3-{s}") for s in ("dev", "mcptox-all", "benign", "probes"))
 
     if sem:
         sem_rows = "".join(
@@ -270,21 +313,12 @@ def build() -> str:
             "<th>失败</th><th>部署口径检出 / 误报</th><th>用时</th></tr></thead>"
             f"<tbody>{sem_rows}</tbody></table>"
             "<p>召回和误报附 Wilson 95% CI；失败不进入分类指标分母，但保留在部署口径中。"
-            "这是独立 LLM 分类器的离线结果，不等于 v3 + LLM 组合网关或 Agent 行为评测。"
+            "这是独立 LLM 分类器的离线结果，不等于 deny 层 + LLM 的组合效果或 Agent 行为评测。"
             "GitHub 同名工具的 schema 变体按快照区分，不代表同样数量的独立工具。"
-            "模型设置、批次延迟与运行过程见<a href=\"detection-report-v2.md\">文字报告</a>。</p>"
+            "模型设置、漏报误报分析与延迟见<a href=\"detection-report.md\">文字报告</a>。</p>"
         )
     else:
-        sem_block = (
-            '<p class="callout"><b>待你手动触发。</b>本机没有本地模型，LLM 检测的真实效果尚未评测。'
-            "代码、单元测试和评测链路自检均已完成；跑完下面的命令后重新生成本页即可。</p>"
-            "<pre>.venv/bin/python -m eval.run_semantic --base-url http://localhost:11434/v1 \\\n"
-            "    --model &lt;模型&gt; --tag &lt;标签&gt; --split dev --limit 20   # 冒烟\n"
-            ".venv/bin/python -m eval.run_semantic ... --split dev          # 调 prompt 用\n"
-            ".venv/bin/python -m eval.run_semantic ... --split test         # 冻结后只跑一次\n"
-            ".venv/bin/python -m eval.run_semantic ... --split benign       # 冻结后只跑一次\n"
-            ".venv/bin/python -m eval.report_html</pre>"
-        )
+        sem_block = '<p class="callout">还没有 LLM 评测结果。评测命令见文字报告的「复现」一节。</p>'
 
     if selfcheck:
         sc_rows = "".join(
@@ -306,18 +340,12 @@ def build() -> str:
     return TEMPLATE.format(
         today=date.today().isoformat(),
         tiles=tiles,
-        recall_chart=recall_chart,
-        fpr_chart=fpr_chart,
         layer_chart=layer_chart,
-        table_rows=table_rows,
+        llm_chart=llm_chart,
+        history_chart=history_chart,
+        current_rows=current_rows,
+        history_rows=history_rows,
         sem_block=sem_block,
-        sem_conclusion=(
-            "<b>已记录本地模型实测结果。</b>召回、误报、失败与耗时见下表；"
-            "默认仍关闭，不把离线分类结果当成实际 Agent 防护收益。"
-            if sem else
-            "<b>LLM 语义检测已实现并完成无模型验证。</b>默认关闭，走 OpenAI 兼容接口，"
-            "按定义摘要缓存，失败分两类处置；真实模型效果待手动评测。"
-        ),
         sc_rows=sc_rows,
         test_rows=test_rows,
     )
@@ -328,7 +356,7 @@ TEMPLATE = """<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>mcp-guarder 投毒检测评测报告 v2</title>
+<title>mcp-guarder 投毒检测评测报告</title>
 <style>
 .viz-root {{
   color-scheme: light;
@@ -386,6 +414,8 @@ th {{ color: var(--text-secondary); font-weight: 600; }}
 pre {{ background: var(--surface-2); padding: 12px 14px; border-radius: 8px; overflow-x: auto; font-size: 13px; }}
 .callout {{ background: var(--surface-2); border-left: 3px solid var(--series-2); padding: 10px 14px; border-radius: 4px; }}
 ul {{ padding-left: 20px; }}
+code {{ font-size: 13px; background: var(--surface-2); padding: 1px 4px; border-radius: 4px; }}
+a {{ color: var(--series-1); }}
 #tip {{ position: fixed; pointer-events: none; background: var(--text-primary); color: var(--surface-1);
   padding: 6px 10px; border-radius: 6px; font-size: 12.5px; max-width: 360px; opacity: 0; transition: opacity .08s; }}
 .toggle {{ float: right; background: var(--surface-2); color: var(--text-secondary); border: 1px solid var(--border);
@@ -397,40 +427,45 @@ ul {{ padding-left: 20px; }}
 <div class="viz-root">
 <main>
 <button class="toggle" onclick="const r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'">切换深色 / 浅色</button>
-<h1>mcp-guarder 投毒检测评测报告 v2</h1>
-<div class="meta">生成于 {today} · 数据：MCPTox @ f85189f，github-mcp-server @ e3809fe · 配套文字版：detection-report-v2.md</div>
+<h1>mcp-guarder 投毒检测评测报告</h1>
+<div class="meta">生成于 {today} · 数据：MCPTox @ f85189f，github-mcp-server @ e3809fe · 配套文字版：<a href="detection-report.md">detection-report.md</a> · 迭代过程：<a href="history/">history/</a></div>
 
 <div class="tiles">{tiles}</div>
 
 <h2>结论</h2>
 <ul>
-<li><b>正则覆盖了 MCPTox 的已知写法，但这不等于泛化。</b>v2 用 MCPTox 全量编写，覆盖率只能当拟合指标；真正的泛化参考仍是 v1 在测试集上的 72%。</li>
-<li><b>真实描述上的误报开始出现。</b>GitHub 141 个真实工具上，v1 误报 2 条，v2 误报 3 条（2.1%），全部是合法的跨工具前置条件或参数说明，正则在句法上无法区分。</li>
-<li>{sem_conclusion}</li>
-<li><b>v3 分层落地：</b>同一套规则按精确度拆成 deny / warn 两层。deny 层 10 条在所有正常样本上 0 误报，但只能自动拦下 MCPTox 的 16.9%；其余 83% 的投毒只命中宽泛规则，要靠 LLM 判断，模型不可用时只会告警。</li>
+<li><b>自动剥离靠 deny 层：零误报，但覆盖有限。</b>11 条高精确度规则在 MCPTox 正常样本和 GitHub 真实描述上都没有误报，能自动拦下 MCPTox 的约五分之一。</li>
+<li><b>区分意图靠 LLM。</b>本地 9B 模型在没见过的测试集上召回 94.2%，比只看开发集写出来的正则（72.0%）高 22 个点；GitHub 真实定义全部判为正常。</li>
+<li><b>warn 规则只当线索。</b>31 条全部算上能覆盖 MCPTox 的 96.9%，但这是拟合数字；它们在真实描述上已经出现误报，句法上和投毒分不开，所以只告警。</li>
+<li><b>没开 LLM 时，自动防护只有 deny 层。</b>deny 层 + LLM 的组合只做过 CLI 冒烟，没有全量评测。</li>
 </ul>
 
-<h2>正则规则：召回与误报</h2>
-{recall_chart}
-{fpr_chart}
-
-<h2>v3：按精确度分层</h2>
-<p>同一套 31 条规则，按精确度拆成两层：10 条高精确度规则命中即剥离，不再调用 LLM；21 条宽泛规则只告警，由 LLM 判断意图。代价是：模型不可用时，自动剥离只剩 deny 层的覆盖。</p>
+<h2>内置规则</h2>
+<p>31 条规则，每条自带处置方式。11 条 deny 命中即从 tools/list 剥离，不送 LLM；20 条 warn 只告警，开了 LLM 时由 LLM 判断意图。<code>read-extra-file</code>（<code>~/.ssh/</code>、<code>.env</code> 等路径）刻意放在 deny：没开 LLM 时这是最典型的投毒，代价是手写探测里 1 条合法描述被误剥离。</p>
 {layer_chart}
 
 <h2>LLM 语义检测</h2>
+{llm_chart}
 {sem_block}
 
+<h2>规则演进</h2>
+<p>v0–v3 是评测过程中的实验编号，规则已合并为一套内置规则（v3 的正则，<code>read-extra-file</code> 改回 deny）。</p>
+{history_chart}
+
 <h2>验证</h2>
-<p>评测链路自检：本地假 OpenAI 服务用 v2 正则作答，评测 runner 必须复现出和直接跑正则完全相同的数字。</p>
+<p>评测链路自检：本地假 OpenAI 服务用内置正则作答，评测 runner 必须复现出和直接跑正则完全相同的数字。</p>
 <table><thead><tr><th>检查项</th><th>结果</th></tr></thead><tbody>{sc_rows}</tbody></table>
 <p>单元测试（按模块）：</p>
 <table><thead><tr><th>模块</th><th>用例数</th></tr></thead><tbody>{test_rows}</tbody></table>
 
 <h2>明细数据</h2>
+<p>现行内置规则：</p>
+<table><thead><tr><th>检测层 / 样本集</th><th>召回</th><th>召回率</th><th>95% CI</th><th>误报</th><th>误报 95% CI</th></tr></thead>
+<tbody>{current_rows}</tbody></table>
+<p>规则演进（历史实验）：</p>
 <table><thead><tr><th>规则 / 样本集</th><th>召回</th><th>召回率</th><th>95% CI</th><th>误报</th><th>误报 95% CI</th></tr></thead>
-<tbody>{table_rows}</tbody></table>
-<p class="meta">所有比例都附原始计数和 Wilson 95% 置信区间。留出集（test、benign）每个规则版本只运行一次。</p>
+<tbody>{history_rows}</tbody></table>
+<p class="meta">所有比例都附原始计数和 Wilson 95% 置信区间。留出集（test、benign）同一套正则只运行一次。</p>
 </main>
 <div id="tip" role="tooltip"></div>
 </div>
