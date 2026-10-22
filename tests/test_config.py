@@ -566,10 +566,34 @@ def test_pattern_rule_missing_keys(write_config):
 
 
 def test_compile_pattern_rules_accepts_tuple_pairs():
-    rules = compile_pattern_rules(SPEC_STATIC_RULES, where="x")
-    assert len(rules) == len(SPEC_STATIC_RULES)
+    rules = compile_pattern_rules(SPEC_REDACT_RULES, where="x")
+    assert len(rules) == len(SPEC_REDACT_RULES)
     assert all(isinstance(r.regex, re.Pattern) for r in rules)
-    assert rules[0].id == "hidden-instruction-tag"
+    assert rules[0].id == "aws-akid"
+    assert all(r.on_hit is None for r in rules)
+
+
+def test_compile_pattern_rules_accepts_triples_with_on_hit():
+    rules = compile_pattern_rules(
+        [("a", "x", "deny"), ("b", "y", "warn")], where="x", allow_on_hit=True
+    )
+    assert [(r.id, r.on_hit) for r in rules] == [
+        ("a", StaticCheckAction.DENY),
+        ("b", StaticCheckAction.WARN),
+    ]
+
+
+def test_compile_pattern_rules_rejects_triples_without_on_hit_support():
+    """脱敏规则没有处置方式，三元组写法同样要拒绝。"""
+    with pytest.raises(ConfigError) as excinfo:
+        compile_pattern_rules([("a", "x", "warn")], where="redact.rules")
+    assert "redact.rules[0]" in problems_text(excinfo.value)
+
+
+def test_compile_pattern_rules_rejects_bad_triple_on_hit():
+    with pytest.raises(ConfigError) as excinfo:
+        compile_pattern_rules([("a", "x", "block")], where="x", allow_on_hit=True)
+    assert "x[0].on_hit" in problems_text(excinfo.value)
 
 
 def test_compile_regex_reports_field_path():

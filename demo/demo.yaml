@@ -30,16 +30,9 @@ inspect:
     on_change: deny_and_alert         # rug pull：描述一变就剥离 + 告警
   static_checks:
     enabled: true
-    on_hit: deny                      # 命中即从 tools/list 剥离
     scan_fields: [name, title, description, inputSchema, annotations]
-    rules:
-      - {id: hidden-instruction-tag, pattern: '(?is)<\s*(IMPORTANT|SYSTEM|SECRET|INSTRUCTIONS)\s*>'}
-      - {id: ignore-previous,   pattern: '(?i)ignore\s+(all\s+)?(previous|prior|above)\s+(instruction|prompt)'}
-      - {id: read-extra-file,   pattern: '(?i)(~/\.ssh/|id_rsa|/\.env\b|~/\.aws/credentials|\.claude\.json)'}
-      - {id: do-not-tell-user,  pattern: "(?i)(do not|don't)\\s+(tell|mention|reveal).{0,40}(user|human)"}
-      - {id: base64-blob,       pattern: '[A-Za-z0-9+/]{200,}={0,2}'}
-      - {id: ansi-escape,       pattern: '\x1b\[[0-9;]*[A-Za-z]'}
-      - {id: cross-server-ref,  pattern: '(?i)\bmcp__[a-z0-9_]+__'}
+    # 不写 rules：用内置规则，deny 规则命中即从 tools/list 剥离，warn 规则只告警
+    # 投毒版 echo 同时命中 hidden-instruction-tag 和 read-extra-file，两条都是 deny
 
 # ── 2. 权限门：默认拒绝 ──
 policy:

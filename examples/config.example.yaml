@@ -21,16 +21,15 @@ inspect:
     on_change: deny_and_alert         # 指纹变化时拒绝该 tool，并记录告警
   static_checks:
     enabled: true
-    on_hit: deny                      # 命中规则后可选择 deny 或 warn；单条规则可写 on_hit 覆盖（见 eval/rules/v3.yaml）
     scan_fields: [name, title, description, inputSchema, annotations]
-    rules:
-      - {id: hidden-instruction-tag, pattern: '(?is)<\s*(IMPORTANT|SYSTEM|SECRET|INSTRUCTIONS)\s*>'}
-      - {id: ignore-previous,   pattern: '(?i)ignore\s+(all\s+)?(previous|prior|above)\s+(instruction|prompt)'}
-      - {id: read-extra-file,   pattern: '(?i)(~/\.ssh/|id_rsa|/\.env\b|~/\.aws/credentials|\.claude\.json)'}
-      - {id: do-not-tell-user,  pattern: "(?i)(do not|don't)\\s+(tell|mention|reveal).{0,40}(user|human)"}
-      - {id: base64-blob,       pattern: '[A-Za-z0-9+/]{200,}={0,2}'}
-      - {id: ansi-escape,       pattern: '\x1b\[[0-9;]*[A-Za-z]'}
-      - {id: cross-server-ref,  pattern: '(?i)\bmcp__[a-z0-9_]+__'}   # 描述引用其他 Server 时，提示 shadowing 风险
+    # 不写 rules 就用内置的 31 条规则（src/mcp_guarder/types.py 的 SPEC_STATIC_RULES）：
+    #   11 条 deny：高精确度，命中即从 tools/list 剥离，不再送 LLM
+    #   20 条 warn：合法描述里也常见的句式，只告警；开了 semantic 时由 LLM 判断意图
+    # 内置规则自带处置方式，不受下面 on_hit 影响；on_hit 只作用于自己写的、没标 on_hit 的规则。
+    # 写了 rules 就整份替换内置规则，格式：
+    #   rules:
+    #     - {id: my-rule, pattern: '(?i)exfiltrate', on_hit: deny}   # on_hit 可省略
+    on_hit: deny
   semantic:                           # LLM 语义投毒检测，默认关闭
     enabled: false
     base_url: http://localhost:11434/v1   # 任意 OpenAI 兼容的 Chat Completions 端点（Ollama / vLLM / LM Studio）

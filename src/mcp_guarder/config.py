@@ -450,7 +450,7 @@ def parse_audit(raw: Mapping[str, Any] | None) -> AuditConfig:
 
 
 def compile_pattern_rules(
-    raw_rules: Sequence[Mapping[str, Any]] | Sequence[tuple[str, str]],
+    raw_rules: Sequence[Mapping[str, Any]] | Sequence[tuple[str, ...]],
     *,
     where: str,
     allow_on_hit: bool = False,
@@ -458,8 +458,9 @@ def compile_pattern_rules(
     """把 ``[{id, pattern}, ...]`` 编译成 :class:`PatternRule` 元组。
 
     正则编译失败 → ConfigError（启动期就拒，别留到运行期变成 DetectorError）。
-    也接受 ``[(id, pattern), ...]`` 形态，方便直接吃
-    :data:`~mcp_guarder.types.SPEC_STATIC_RULES` 这类常量。
+    也接受 ``[(id, pattern), ...]`` 形态，方便直接吃 :data:`~mcp_guarder.types.SPEC_REDACT_RULES`
+    这类常量；``allow_on_hit`` 时还接受 ``(id, pattern, on_hit)``
+    （:data:`~mcp_guarder.types.SPEC_STATIC_RULES`）。
 
     :param allow_on_hit: 只有静态检查规则传 True，允许可选的 ``on_hit: deny|warn``。
     """
@@ -489,13 +490,15 @@ def compile_pattern_rules(
             pattern = item["pattern"]
             raw_on_hit = item.get("on_hit") if allow_on_hit else None
         elif isinstance(item, (tuple, list)) and not isinstance(item, (str, bytes)):
-            if len(item) != 2:
-                problems.append(
-                    f"{item_where}: expected a 2-item (id, pattern) pair, got {len(item)} item(s)"
-                )
+            if len(item) == 3 and allow_on_hit:
+                rule_id, pattern, raw_on_hit = item
+            elif len(item) == 2:
+                rule_id, pattern = item
+                raw_on_hit = None
+            else:
+                shape = "(id, pattern[, on_hit])" if allow_on_hit else "2-item (id, pattern) pair"
+                problems.append(f"{item_where}: expected a {shape}, got {len(item)} item(s)")
                 continue
-            rule_id, pattern = item
-            raw_on_hit = None
         else:
             problems.append(
                 f"{item_where}: expected a mapping with keys {list(_PATTERN_RULE_KEYS)}, "
@@ -893,7 +896,7 @@ def _parse_fingerprint(raw: Any) -> FingerprintConfig:
 
 
 def _parse_static_checks(raw: Any) -> StaticChecksConfig:
-    """``inspect.static_checks:`` 段。规则缺省用 SPEC §4 那 7 条。"""
+    """``inspect.static_checks:`` 段。规则缺省用内置规则，每条自带处置方式。"""
     defaults = StaticChecksConfig()
     if raw is None:
         return StaticChecksConfig(
@@ -901,7 +904,7 @@ def _parse_static_checks(raw: Any) -> StaticChecksConfig:
             on_hit=defaults.on_hit,
             scan_fields=defaults.scan_fields,
             rules=compile_pattern_rules(
-                SPEC_STATIC_RULES, where="inspect.static_checks.rules"
+                SPEC_STATIC_RULES, where="inspect.static_checks.rules", allow_on_hit=True
             ),
         )
     section = _require_mapping(raw, where="inspect.static_checks")
@@ -947,7 +950,7 @@ def _parse_static_checks(raw: Any) -> StaticChecksConfig:
         if value is not None:
             scan_fields = value
 
-    # 缺省用 SPEC 的规则集；显式写了（哪怕是空列表）就用用户的。
+    # 缺省用内置规则；显式写了（哪怕是空列表）就整份换成用户的。
     rules = _capture(
         problems,
         lambda: compile_pattern_rules(

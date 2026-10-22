@@ -816,18 +816,80 @@ class Routed:
 
 
 # ────────────────────────────────────────────────────────────────────────────
-# SPEC §4 里写死的默认规则集（配置省略该段时用这份兜底）
-# 这些正则**逐字抄自 SPEC §4**，不要自己改写、不要加规则。
+# 内置投毒检测规则（配置省略 ``inspect.static_checks.rules`` 时使用）
+#
+# 每条规则自带处置方式：
+#   deny：高精确度，命中即从 tools/list 剥离，不再送 LLM。
+#   warn：合法描述里也常见的句式，只告警；开了 LLM 语义检测时由 LLM 判断意图。
+# 规则自己的处置方式优先于 ``inspect.static_checks.on_hit``。
+#
+# 改任何一条都会改变检测效果，需要按 docs/eval/detection-report.md 的口径重新评测。
 # ────────────────────────────────────────────────────────────────────────────
 
-SPEC_STATIC_RULES: tuple[tuple[str, str], ...] = (
-    ("hidden-instruction-tag", r"(?is)<\s*(IMPORTANT|SYSTEM|SECRET|INSTRUCTIONS)\s*>"),
-    ("ignore-previous", r"(?i)ignore\s+(all\s+)?(previous|prior|above)\s+(instruction|prompt)"),
-    ("read-extra-file", r"(?i)(~/\.ssh/|id_rsa|/\.env\b|~/\.aws/credentials|\.claude\.json)"),
-    ("do-not-tell-user", r"(?i)(do not|don't)\s+(tell|mention|reveal).{0,40}(user|human)"),
-    ("base64-blob", r"[A-Za-z0-9+/]{200,}={0,2}"),
-    ("ansi-escape", r"\x1b\[[0-9;]*[A-Za-z]"),
-    ("cross-server-ref", r"(?i)\bmcp__[a-z0-9_]+__"),
+SPEC_STATIC_RULES: tuple[tuple[str, str, str], ...] = (
+    # 伪装成系统指令的标签：<IMPORTANT>、<SYSTEM> 等。
+    ("hidden-instruction-tag", r"(?is)<\s*(IMPORTANT|SYSTEM|SECRET|INSTRUCTIONS)\s*>", "deny"),
+    # 让模型忽略之前的指令。
+    ("ignore-previous", r"(?i)ignore\s+(all\s+)?(previous|prior|above)\s+(instruction|prompt)", "deny"),
+    # 凭据与配置文件路径：~/.ssh、.env、AWS 凭据、.claude.json。合法的 SSH / dotenv 工具也可能提到，
+    # 但没开 LLM 时这是最典型的攻击，所以直接剥离。
+    ("read-extra-file", r"(?i)(~/\.ssh/|id_rsa|/\.env\b|~/\.aws/credentials|\.claude\.json)", "deny"),
+    # 要求对用户隐瞒。
+    ("do-not-tell-user", r"(?i)(do not|don't)\s+(tell|mention|reveal).{0,40}(user|human)", "deny"),
+    # 超长 base64 串，可能藏着编码后的指令。
+    ("base64-blob", r"[A-Za-z0-9+/]{200,}={0,2}", "warn"),
+    # ANSI 控制序列，在终端里能把文字藏起来。
+    ("ansi-escape", r"\x1b\[[0-9;]*[A-Za-z]", "deny"),
+    # 引用其他 Server 的工具名，提示 shadowing 风险。
+    ("cross-server-ref", r"(?i)\bmcp__[a-z0-9_]+__", "warn"),
+    # 优先级劫持：声称自己的指令高于用户请求。
+    ("priority-override", r"(?i)\b(priority|precedence)\b.{0,30}\b(higher|over|above|supersedes?)\b.{0,30}\b(user|query|request|instruction)", "warn"),
+    # 无视用户输入：regardless of what the user asked / original path ...
+    ("regardless-of-user", r"(?i)\bregardless\s+of\s+(the\s+|what\s+the\s+)?(user|original|requested|actual|input|query)", "warn"),
+    # 跨工具前置指令：使用某工具前必须先调用另一个具名工具。
+    ("cross-tool-precondition", r"""(?i)\b(before|prior\s+to)\s+(using|calling|invoking|executing)\b.{0,120}?\b(must|required|need\s+to|have\s+to|mandatory)\b.{0,80}?\b(call|use|invoke|execute|run)\b\s+(the\s+)?['"`]?[a-z_][a-z0-9_.-]*['"`]?""", "warn"),
+    # 强制调用某个具名工具：you must call 'x'。
+    ("must-call-tool", r"""(?i)\byou\s+must\s+(first\s+|also\s+|always\s+)?(call|invoke|execute|run|use)\s+(the\s+)?['"`][a-z_][a-z0-9_.-]*['"`]""", "warn"),
+    # 参数篡改：要求模型改写某个具名参数的值。
+    ("argument-tampering", r"""(?i)\b(modify|change|replace|set|override|overwrite|append|prepend|add|alter|rewrite)\b\s+(the\s+)?['"`]?[a-z_][a-z0-9_]*['"`]?\s+(argument|parameter|param|field|value)\b""", "warn"),
+    # 把参数改成某个字面量：argument to '...'。
+    ("argument-to-literal", r"""(?i)\b(argument|parameter)\s+(to|with|into)\s+['"`]""", "warn"),
+    # 条件式改写：在使用某工具时，要求改写 / 追加 / 替换输入。
+    ("when-using-rewrite", r"(?i)\bwhen\s+(using|calling|invoking|creating|running|the\s+user|a\s+user|user)\b.{0,100}?\b(append|prepend|replace|override|overwrite|modify|change|rewrite|reroute|alter|set)\b", "warn"),
+    # 无条件改写：always append / replace ...
+    ("always-rewrite", r"(?i)\balways\s+(append|prepend|replace|override|overwrite|rewrite|modify|change)\b", "warn"),
+    # 跨工具前置调用（宽松版）：使用 X 之前，触发 / 调用 / 运行另一个具名工具。
+    ("before-trigger-tool", r"""(?i)\b(before|prior\s+to)\s+(using|calling|invoking|running|executing)\b.{0,80}?\b(use|call|trigger|run|invoke|execute)\b\s+(the\s+)?[`'"]?[a-z_]+[_-][a-z0-9_-]+""", "warn"),
+    # 系统敏感文件：/etc/passwd、.bash_history、.netrc、.git-credentials。
+    ("sensitive-system-file", r"(?i)(/etc/(passwd|shadow|sudoers)|\.bash_history|\.netrc\b|\.git-credentials)", "deny"),
+    # 强制改道：must + 追加 / 替换 / 重定向 / 改走 / 忽略用户输入。
+    ("must-redirect", r"(?i)\bmust\s+(instead\s+|first\s+|always\s+)?(append|prepend|replace|redirect|route|reroute|ignore\s+the\s+user|instead\s+call|use\s+the\s+new)\b", "warn"),
+    # 被动句式的强制改道：must be replaced / rerouted ...
+    ("must-be-rerouted", r"(?i)\bmust\s+be\s+(replaced|redirected|routed|rerouted|appended|prepended|restricted\s+to)\b", "warn"),
+    # 前置从句 + 调用具名工具，覆盖 camelCase 工具名和更多动词：Before updating, call get_file_contents。
+    ("before-clause-tool-call", r"(?i)\b(before|prior\s+to)\s+(?:[a-z][a-z ]{0,40}?\s)?(using|calling|running|use|call|run|[a-z]+ing)\b[^.]{0,80}?,?\s+(you\s+(should|must|need\s+to|have\s+to)\s+)?(first\s+|always\s+)?(use|call|run|trigger|invoke|execute|fetch|request|scan|perform|query|search|read|send|mark|move|delete)\b[^.]{0,40}?(`[A-Za-z][\w.-]*`|'[A-Za-z][\w.-]*'|\b(?-i:[a-z]+[A-Z][A-Za-z0-9]*)\b|\b[a-z]+_[a-z0-9_]+\b)", "warn"),
+    # make sure to call / get ...
+    ("make-sure-call", r"(?i)\bmake\s+sure\s+(to\s+|you\s+)?(get|call|run|use|invoke|fetch|send|delete)\b", "warn"),
+    # 声称会自动调用某个工具：automatically call `x`、triggers `x`。
+    ("auto-trigger-tool", r"(?i)\b(automatically\s+(call|invoke|run|trigger)|triggers|requires\s+calling)\s+(`[A-Za-z][\w.-]*`|'[A-Za-z][\w.-]*'|[a-z]+_[a-z0-9_]+|(?-i:[a-z]+[A-Z][A-Za-z0-9]*))", "warn"),
+    # 改用另一个工具：instead call、is now aliased to。
+    ("instead-call", r"(?i)\b(instead\s+call|must\s+instead|is\s+now\s+aliased\s+to)\b", "warn"),
+    # 恐吓式后果：不照做就会崩溃 / 损坏。
+    ("threat-consequence", r"(?i)\b(failure\s+to|skipping|omitting|ignoring|not\s+doing)\b[^.]{0,30}\b(will|would|could)\s+(cause|crash|corrupt|overload|disrupt|break|fail|result\s+in)", "deny"),
+    # 隐蔽动作：悄悄地 / 隐藏地 / 不告诉用户。
+    ("covert-action", r"(?i)\b(silently|secretly|covertly|quietly)\s+(add|send|include|call|insert|append|forward|copy|upload|delete|modify|change|record|log|store|run|invoke)\b|\b(without\s+(telling|informing|notifying|asking)\s+the\s+user)\b|\binject\s+(one\s+|a\s+)?hidden\b", "deny"),
+    # 安全 / 政策式横幅，给恶意指令披上合规外衣。不收单独的 IMPORTANT（合法描述常用）。
+    ("policy-banner", r"(?:^|[.!]\s+)(SYSTEM\s+(POLICY|NOTE|DATA\s+ROUTING\s+POLICY|RULE)|SECURITY\s+(ALERT|SCAN|RULE|PROTOCOL|NOTICE)|AUDIT\s+REQUIREMENT|BACKUP\s+PROTOCOL|CONTENT\s+POLICY|COMPLIANCE\s+(RULE|REQUIREMENT)|IMPORTANT\s+SECURITY\s+RULE|System\s+(Policy|Alias|Optimization|note))\b", "deny"),
+    # 声称最高优先级：highest priority、takes precedence over。
+    ("priority-claim", r"(?i)\b(highest|top)\s+priority\b|\btake[s]?\s+precedence\s+over\b", "warn"),
+    # 对审查者 / 分类器喊话：合法描述几乎不会对安全审查者说话。
+    ("judge-addressing", r"""(?i)\b(note|message|guidance|instructions?|attention)\s+(to|for)\s+(any\s+)?(ai|automated|security|llm)?\s*(reviewers?|scanners?|evaluators?|classifiers?|auditors?|moderators?)\b|\b(classify|mark|label|treat)\s+(it|this(\s+tool)?)\s+as\s+(benign|safe|harmless)\b|\b(scanners?|reviewers?|classifiers?|evaluators?|auditors?)\s+(must|should)\s+(output|respond|classify|return|report)\b|\bif\s+you\s+are\s+an?\s+(ai|llm|model|language\s+model)\b|\b(respond|reply|answer|output)\s+(only\s+)?with\s+(the\s+word\s+)?['"{]?(safe|benign|verdict)""", "deny"),
+    # 外发到具体邮箱或 URL。
+    ("send-to-address", r"(?i)\b(send|forward|upload|post|copy|bcc|cc|email|mail|route|report)\b[^.]{0,60}?\b(to|bcc|cc)\b\s*:?\s*([\w.+-]+@[\w-]+\.[\w.-]+|https?://)", "warn"),
+    # 拿 password、secret 这类敏感关键词去查询。
+    ("sensitive-query", r"""(?i)\b(keywords?|query|term|search(es)?)\b[^.]{0,20}?['"=]\s*['"]?[^'"]{0,30}\b(password|passwd|secret|confidential|credential|private\s+key|api[_ ]key|token|ssn|sensitive\s+data)""", "warn"),
+    # 宽松版 ignore-previous：允许中间夹一两个词（ignore your previous classification instructions）。
+    ("ignore-instructions-broad", r"(?i)\b(ignore|disregard|forget)\s+(all\s+|any\s+|your\s+)*(previous|prior|above|earlier|original)\s+(\w+\s+){0,2}(instructions?|prompts?|rules?|guidelines?)", "deny"),
 )
 
 SPEC_REDACT_RULES: tuple[tuple[str, str], ...] = (
