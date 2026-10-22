@@ -1,11 +1,11 @@
 """静态投毒检测：扫 tool 的 name/title/description/inputSchema/annotations（SPEC §2 T1/T6 / §4 / §7 M3）。
 
-命中处置由 ``inspect.static_checks.on_hit`` 决定：
+命中处置看规则自己的 ``on_hit``，没写就用 ``inspect.static_checks.on_hit``：
 - ``deny``（默认）：该 tool 从 ``tools/list`` 响应里**剥离**，一个都不剩就返空列表
   （SPEC §5 第六行）。模型看不到这个工具，后续调用自然走 no-match deny。
 - ``warn``：只记 guard.log + 审计，不剥离。
 
-本模块只负责**扫出命中**，剥不剥离由 proxy 看 ``config.on_hit`` 决定 ——
+本模块只负责**扫出命中**，剥不剥离由 proxy 按 ``config.action_for(rule_id)`` 决定 ——
 两种模式扫描逻辑完全一样，报告也一样。
 
 关键细节：
